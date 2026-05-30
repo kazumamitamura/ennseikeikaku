@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #1a3a5c;
+  --primary-light: #2d5f8a;
+  --accent: #e85d04;
+  --accent-light: #f48c06;
+  --success: #2d6a4f;
+  --danger: #c1121f;
+  --warning: #f77f00;
+  --bg: #f8f9fa;
+  --bg-card: #ffffff;
+  --text: #212529;
+  --text-muted: #6c757d;
+  --border: #dee2e6;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Sans JP', 'Hiragino Sans', sans-serif;
+}
+
+.balance-positive { color: var(--success); }
+.balance-negative { color: var(--danger); }
+
+.input-currency {
+  @apply text-right font-mono text-lg border-2 border-gray-200 rounded-lg p-2
+         focus:border-blue-500 focus:outline-none transition-colors;
+}
+
+.section-card {
+  @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-4;
+}
