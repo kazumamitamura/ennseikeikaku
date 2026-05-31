@@ -107,8 +107,11 @@ export default function HomePageClient() {
         <p className="text-gray-600 mb-4">
           .env.local に Supabase の接続情報を設定してください。
         </p>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 mb-2">
           .env.local.example を参考に NEXT_PUBLIC_SUPABASE_URL と NEXT_PUBLIC_SUPABASE_ANON_KEY を設定してください。
+        </p>
+        <p className="text-sm text-gray-500">
+          Vercel デプロイ時は Environment Variables にも同じ値を設定し、Supabase で supabase/schema.sql を実行してください。
         </p>
       </div>
     );

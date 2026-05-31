@@ -46,12 +46,14 @@ export default function NewExpeditionPage() {
           ...data,
         }),
       });
-      if (!res.ok) throw new Error('作成に失敗しました');
-      const { id } = await res.json();
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || '作成に失敗しました');
+      const { id } = result;
       toast.success('遠征を作成しました');
       router.push(`/expedition/${id}`);
-    } catch {
-      toast.error('遠征の作成に失敗しました');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : '遠征の作成に失敗しました';
+      toast.error(message, { duration: 6000 });
     } finally {
       setLoading(false);
     }
