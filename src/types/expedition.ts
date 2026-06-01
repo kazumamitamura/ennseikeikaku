@@ -411,3 +411,71 @@ export interface SubsidyGroupSummary {
   person_count: number;
   skipped_count: number;
 }
+
+// ============================================================
+// v4: 補助単価マスター + 個人別宿泊・食事マトリクス
+// ============================================================
+
+export interface SubsidyRates {
+  id?: string;
+  expedition_id: string;
+  accommodation_rate: number;
+  breakfast_rate: number;
+  lunch_rate: number;
+  dinner_rate: number;
+}
+
+export type PersonalCostItemType =
+  | 'accommodation'
+  | 'breakfast'
+  | 'lunch'
+  | 'dinner';
+
+export const RATE_KEY: Record<PersonalCostItemType, keyof SubsidyRates> = {
+  accommodation: 'accommodation_rate',
+  breakfast: 'breakfast_rate',
+  lunch: 'lunch_rate',
+  dinner: 'dinner_rate',
+};
+
+export const ITEM_LABELS: Record<PersonalCostItemType, string> = {
+  accommodation: '🏨 宿泊',
+  breakfast: '🍳 朝食',
+  lunch: '🥗 昼食',
+  dinner: '🍱 夕食',
+};
+
+export const ITEM_ORDER: PersonalCostItemType[] = [
+  'accommodation', 'breakfast', 'lunch', 'dinner',
+];
+
+export interface PersonalCost {
+  id: string;
+  expedition_id: string;
+  member_id: string;
+  item_type: PersonalCostItemType;
+  date: string;
+  actual_amount: number;
+  subsidy_amount: number;
+  is_subsidy_target: boolean;
+  is_skipped: boolean;
+  skip_reason?: string;
+  auto_excluded: boolean;
+  auto_exclude_reason?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PersonalCostCalc extends PersonalCost {
+  net_amount: number;
+  effective_subsidy: number;
+}
+
+export const SUBSIDY_TARGET_ROLES: MemberRole[] = ['athlete', 'advisor', 'second'];
+
+export const PERSONAL_COST_ROLE_GROUPS: { label: string; roles: MemberRole[] }[] = [
+  { label: '選手・セコンド・顧問', roles: ['athlete', 'second', 'advisor'] },
+  { label: '外部指導者・引率', roles: ['external_coach', 'staff'] },
+  { label: '応援', roles: ['supporter'] },
+];

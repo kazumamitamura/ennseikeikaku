@@ -1,22 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Link from 'next/link';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import Badge from '@/components/ui/Badge';
 import Sidebar from '@/components/layout/Sidebar';
 import CostCalculator from '@/components/expedition/CostCalculator';
-import SubsidyPersonSection from '@/components/expedition/SubsidyPersonSection';
+import SubsidyRatesForm from '@/components/expedition/SubsidyRatesForm';
+import PersonalCostMatrix from '@/components/expedition/PersonalCostMatrix';
 import { useExpedition } from '@/hooks/useExpedition';
 import { formatDate } from '@/lib/calculations';
+import type { SubsidyRates } from '@/types/expedition';
+import { calcSummary } from '@/lib/personalCostCalc';
 
 interface PageProps {
   params: { id: string };
 }
 
 const TABS = [
-  { id: 'summary',  label: '📊 収支計算' },
-  { id: 'subsidy',  label: '🏨 補助対象費' },
+  { id: 'summary', label: '📊 収支計算' },
+  { id: 'subsidy', label: '🏨 補助対象費' },
 ] as const;
 
 type TabId = typeof TABS[number]['id'];
@@ -25,6 +28,21 @@ export default function ExpeditionDetailPage({ params }: PageProps) {
   const { id } = params;
   const { data, loading, error } = useExpedition(id);
   const [activeTab, setActiveTab] = useState<TabId>('summary');
+  const [subsidyRates, setSubsidyRates] = useState<SubsidyRates>({
+    expedition_id: id,
+    accommodation_rate: 0,
+    breakfast_rate: 0,
+    lunch_rate: 0,
+    dinner_rate: 0,
+  });
+
+  const handleRatesChange = useCallback((rates: SubsidyRates) => {
+    setSubsidyRates(rates);
+  }, []);
+
+  const handleSummaryChange = useCallback((_s: ReturnType<typeof calcSummary>) => {
+    // 補助サマリー変更時（収入自動計上は PersonalCostMatrix 内で処理）
+  }, []);
 
   if (loading) {
     return (
@@ -62,18 +80,16 @@ export default function ExpeditionDetailPage({ params }: PageProps) {
         </p>
       </div>
 
-      {/* タブナビゲーション */}
       <div className="flex gap-1 mb-4 overflow-x-auto">
         {TABS.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`
-              px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors
-              ${activeTab === tab.id
+            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
+              activeTab === tab.id
                 ? 'bg-primary text-white shadow-sm'
-                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}
-            `}
+                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }`}
           >
             {tab.label}
           </button>
@@ -89,12 +105,20 @@ export default function ExpeditionDetailPage({ params }: PageProps) {
             <CostCalculator initialData={data} />
           )}
           {activeTab === 'subsidy' && (
-            <SubsidyPersonSection
-              expeditionId={id}
-              members={members}
-              startDate={expedition.start_date}
-              endDate={expedition.end_date}
-            />
+            <div className="space-y-4">
+              <SubsidyRatesForm
+                expeditionId={id}
+                onRatesChange={handleRatesChange}
+              />
+              <PersonalCostMatrix
+                expeditionId={id}
+                members={members}
+                startDate={expedition.start_date}
+                endDate={expedition.end_date}
+                rates={subsidyRates}
+                onSummaryChange={handleSummaryChange}
+              />
+            </div>
           )}
         </div>
       </div>
