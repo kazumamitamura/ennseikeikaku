@@ -238,7 +238,7 @@ export default function SubsidySection({
                   </td>
 
                   {/* 補助対象人数 */}
-                  <td className="py-1.5 px-2">
+                  <td className="py-1.5 px-1.5">
                     {isTarget ? (
                       <input
                         type="number"
@@ -246,29 +246,29 @@ export default function SubsidySection({
                         value={item.subsidy_target_count}
                         onChange={e => updateItem(activeDate, itemType, 'subsidy_target_count', parseInt(e.target.value) || 0)}
                         onFocus={e => e.target.select()}
-                        className="input-currency w-full text-right"
+                        className="input-count"
                       />
                     ) : (
-                      <div className="text-center text-gray-400 text-xs bg-gray-100 rounded py-1.5 cursor-not-allowed">
-                        ×補助対象外
+                      <div className="text-center text-gray-400 text-xs bg-gray-100 rounded py-1.5 cursor-not-allowed border border-gray-300">
+                        ×対象外
                       </div>
                     )}
                   </td>
 
                   {/* 対象外人数 */}
-                  <td className="py-1.5 px-2">
+                  <td className="py-1.5 px-1.5">
                     <input
                       type="number"
                       min="0"
                       value={item.non_subsidy_count}
                       onChange={e => updateItem(activeDate, itemType, 'non_subsidy_count', parseInt(e.target.value) || 0)}
                       onFocus={e => e.target.select()}
-                      className="input-currency w-full text-right"
+                      className="input-count"
                     />
                   </td>
 
-                  {/* 欠席人数（朝食のみ・宿泊以外） */}
-                  <td className="py-1.5 px-2">
+                  {/* 欠席人数（宿泊以外） */}
+                  <td className="py-1.5 px-1.5">
                     {itemType !== 'accommodation' ? (
                       <input
                         type="number"
@@ -276,7 +276,7 @@ export default function SubsidySection({
                         value={item.skip_count}
                         onChange={e => updateItem(activeDate, itemType, 'skip_count', parseInt(e.target.value) || 0)}
                         onFocus={e => e.target.select()}
-                        className="input-currency w-full text-right"
+                        className="input-count"
                       />
                     ) : (
                       <div className="text-center text-gray-300 text-xs">—</div>
@@ -284,7 +284,7 @@ export default function SubsidySection({
                   </td>
 
                   {/* 補助単価 */}
-                  <td className="py-1.5 px-2">
+                  <td className="py-1.5 px-1.5">
                     {isTarget ? (
                       <input
                         type="number"
@@ -292,22 +292,22 @@ export default function SubsidySection({
                         value={item.subsidy_amount_per_person}
                         onChange={e => updateItem(activeDate, itemType, 'subsidy_amount_per_person', parseInt(e.target.value) || 0)}
                         onFocus={e => e.target.select()}
-                        className="input-currency w-full text-right border-green-300 focus:border-green-500"
+                        className="input-num-green"
                       />
                     ) : (
-                      <div className="text-center text-gray-300 text-xs bg-gray-100 rounded py-1.5">—</div>
+                      <div className="text-center text-gray-300 text-xs bg-gray-100 rounded py-1.5 border border-gray-200">—</div>
                     )}
                   </td>
 
                   {/* 実支出単価 */}
-                  <td className="py-1.5 px-2">
+                  <td className="py-1.5 px-1.5">
                     <input
                       type="number"
                       min="0"
                       value={item.actual_amount_per_person}
                       onChange={e => updateItem(activeDate, itemType, 'actual_amount_per_person', parseInt(e.target.value) || 0)}
                       onFocus={e => e.target.select()}
-                      className="input-currency w-full text-right border-blue-300 focus:border-blue-500"
+                      className="input-num-blue"
                     />
                   </td>
 

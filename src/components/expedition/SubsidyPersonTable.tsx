@@ -239,7 +239,7 @@ export default function SubsidyPersonTable({
                       {isEditing ? (
                         <input
                           type="number" min="0"
-                          className="w-20 border border-blue-300 rounded px-1 text-right text-sm focus:outline-none"
+                          className="w-20 border-2 border-blue-500 rounded-lg px-1.5 py-1 text-right text-sm font-mono font-semibold text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-200"
                           value={editActual}
                           onChange={e => setEditActual(parseInt(e.target.value) || 0)}
                           onFocus={e => e.target.select()}
@@ -262,7 +262,7 @@ export default function SubsidyPersonTable({
                       {isEditing ? (
                         <input
                           type="number" min="0"
-                          className="w-20 border border-green-300 rounded px-1 text-right text-sm focus:outline-none"
+                          className="w-20 border-2 border-green-500 rounded-lg px-1.5 py-1 text-right text-sm font-mono font-semibold text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-green-200"
                           value={editSubsidy}
                           onChange={e => setEditSubsidy(parseInt(e.target.value) || 0)}
                           onFocus={e => e.target.select()}

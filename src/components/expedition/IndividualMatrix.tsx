@@ -272,7 +272,7 @@ export default function IndividualMatrix({
                   <select
                     value={bulkStays ? '1' : '0'}
                     onChange={e => setBulkStays(e.target.value === '1')}
-                    className="border rounded px-2 py-1 text-sm w-full"
+                    className="border-2 border-gray-400 rounded-lg px-2 py-1.5 text-sm text-gray-900 bg-white w-full focus:border-blue-600 focus:outline-none"
                   >
                     <option value="1">○ 宿泊</option>
                     <option value="0">ー なし</option>
@@ -285,7 +285,7 @@ export default function IndividualMatrix({
                     inputMode="numeric"
                     value={bulkRoomPrice || ''}
                     onChange={e => setBulkRoomPrice(parseInteger(e.target.value))}
-                    className="input-currency w-full"
+                    className="input-num disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder="0"
                     disabled={!bulkStays}
                   />
@@ -299,7 +299,7 @@ export default function IndividualMatrix({
                 inputMode="numeric"
                 value={bulkBreakfastPrice || ''}
                 onChange={e => setBulkBreakfastPrice(parseInteger(e.target.value))}
-                className="input-currency w-full"
+                className="input-num"
                 placeholder="0"
               />
             </div>
@@ -310,7 +310,7 @@ export default function IndividualMatrix({
                 inputMode="numeric"
                 value={bulkLunchPrice || ''}
                 onChange={e => setBulkLunchPrice(parseInteger(e.target.value))}
-                className="input-currency w-full"
+                className="input-num"
                 placeholder="0"
               />
             </div>
@@ -321,7 +321,7 @@ export default function IndividualMatrix({
                 inputMode="numeric"
                 value={bulkDinnerPrice || ''}
                 onChange={e => setBulkDinnerPrice(parseInteger(e.target.value))}
-                className="input-currency w-full"
+                className="input-num"
                 placeholder="0"
               />
             </div>
@@ -442,7 +442,7 @@ export default function IndividualMatrix({
                           value={accPrice || ''}
                           onChange={e => updateAccRec(member.id, activeDate, { stays, unit_price: parseInteger(e.target.value) })}
                           disabled={!stays}
-                          className="input-currency w-full disabled:opacity-40"
+                          className="input-num disabled:opacity-40 disabled:cursor-not-allowed"
                           placeholder="0"
                         />
                       </td>
@@ -450,13 +450,13 @@ export default function IndividualMatrix({
                   )}
 
                   {/* 朝食 */}
-                  <td className="py-1 text-center">
+                  <td className="py-1 px-0.5 text-center">
                     <button
                       onClick={() => updateMealRec(member.id, activeDate, { breakfast_status: cycleMealStatus(bfStatus), breakfast_price: bfPrice })}
-                      className={`w-8 h-7 rounded text-xs font-bold transition-colors ${
-                        bfStatus === 'eat' ? 'bg-green-100 text-green-700' :
-                        bfStatus === 'skip' ? 'bg-red-100 text-red-600' :
-                        'bg-gray-100 text-gray-400'
+                      className={`w-8 h-7 rounded text-xs font-bold transition-colors border ${
+                        bfStatus === 'eat'  ? 'bg-green-100 text-green-700 border-green-300' :
+                        bfStatus === 'skip' ? 'bg-red-100 text-red-600 border-red-300' :
+                        'bg-gray-100 text-gray-400 border-gray-300'
                       }`}
                     >
                       {bfStatus === 'eat' ? '○' : bfStatus === 'skip' ? '欠' : 'ー'}
@@ -469,19 +469,19 @@ export default function IndividualMatrix({
                       value={bfPrice || ''}
                       onChange={e => updateMealRec(member.id, activeDate, { breakfast_status: bfStatus, breakfast_price: parseInteger(e.target.value) })}
                       disabled={bfStatus === 'none'}
-                      className="input-currency w-full disabled:opacity-40"
+                      className="input-num disabled:opacity-40 disabled:cursor-not-allowed"
                       placeholder="0"
                     />
                   </td>
 
                   {/* 昼食 */}
-                  <td className="py-1 text-center">
+                  <td className="py-1 px-0.5 text-center">
                     <button
                       onClick={() => updateMealRec(member.id, activeDate, { lunch_status: cycleMealStatus(lnStatus), lunch_price: lnPrice })}
-                      className={`w-8 h-7 rounded text-xs font-bold transition-colors ${
-                        lnStatus === 'eat' ? 'bg-green-100 text-green-700' :
-                        lnStatus === 'skip' ? 'bg-red-100 text-red-600' :
-                        'bg-gray-100 text-gray-400'
+                      className={`w-8 h-7 rounded text-xs font-bold transition-colors border ${
+                        lnStatus === 'eat'  ? 'bg-green-100 text-green-700 border-green-300' :
+                        lnStatus === 'skip' ? 'bg-red-100 text-red-600 border-red-300' :
+                        'bg-gray-100 text-gray-400 border-gray-300'
                       }`}
                     >
                       {lnStatus === 'eat' ? '○' : lnStatus === 'skip' ? '欠' : 'ー'}
@@ -494,19 +494,19 @@ export default function IndividualMatrix({
                       value={lnPrice || ''}
                       onChange={e => updateMealRec(member.id, activeDate, { lunch_status: lnStatus, lunch_price: parseInteger(e.target.value) })}
                       disabled={lnStatus === 'none'}
-                      className="input-currency w-full disabled:opacity-40"
+                      className="input-num disabled:opacity-40 disabled:cursor-not-allowed"
                       placeholder="0"
                     />
                   </td>
 
                   {/* 夕食 */}
-                  <td className="py-1 text-center">
+                  <td className="py-1 px-0.5 text-center">
                     <button
                       onClick={() => updateMealRec(member.id, activeDate, { dinner_status: cycleMealStatus(dnStatus), dinner_price: dnPrice })}
-                      className={`w-8 h-7 rounded text-xs font-bold transition-colors ${
-                        dnStatus === 'eat' ? 'bg-green-100 text-green-700' :
-                        dnStatus === 'skip' ? 'bg-red-100 text-red-600' :
-                        'bg-gray-100 text-gray-400'
+                      className={`w-8 h-7 rounded text-xs font-bold transition-colors border ${
+                        dnStatus === 'eat'  ? 'bg-green-100 text-green-700 border-green-300' :
+                        dnStatus === 'skip' ? 'bg-red-100 text-red-600 border-red-300' :
+                        'bg-gray-100 text-gray-400 border-gray-300'
                       }`}
                     >
                       {dnStatus === 'eat' ? '○' : dnStatus === 'skip' ? '欠' : 'ー'}
@@ -519,7 +519,7 @@ export default function IndividualMatrix({
                       value={dnPrice || ''}
                       onChange={e => updateMealRec(member.id, activeDate, { dinner_status: dnStatus, dinner_price: parseInteger(e.target.value) })}
                       disabled={dnStatus === 'none'}
-                      className="input-currency w-full disabled:opacity-40"
+                      className="input-num disabled:opacity-40 disabled:cursor-not-allowed"
                       placeholder="0"
                     />
                   </td>

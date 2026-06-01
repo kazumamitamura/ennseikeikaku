@@ -203,7 +203,7 @@ export default function BulkSubsidyInput({
           </label>
           <input
             type="number" min="0" step="100"
-            className="w-full border-2 border-gray-200 rounded-lg p-2 text-right text-base font-bold focus:border-blue-600 outline-none"
+            className="input-currency w-full"
             value={actualAmount || ''}
             onChange={e => setActual(parseInt(e.target.value) || 0)}
             onFocus={e => e.target.select()}
@@ -225,12 +225,11 @@ export default function BulkSubsidyInput({
           </label>
           <input
             type="number" min="0" step="100"
-            className={`
-              w-full border-2 rounded-lg p-2 text-right text-base font-bold focus:border-blue-600 outline-none
-              ${(!isSubsidyTarget || autoExclude.excluded)
-                ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-                : 'border-gray-200'}
-            `}
+            className={`input-currency w-full ${
+              (!isSubsidyTarget || autoExclude.excluded)
+                ? 'bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60'
+                : 'border-green-400 focus:border-green-600'
+            }`}
             value={subsidyAmount || ''}
             onChange={e => setSubsidy(parseInt(e.target.value) || 0)}
             onFocus={e => e.target.select()}

@@ -26,11 +26,55 @@ body {
 .balance-positive { color: var(--success); }
 .balance-negative { color: var(--danger); }
 
+/* ── 金額入力（通常サイズ） ────────────────────────────── */
 .input-currency {
-  @apply text-right font-mono text-lg border-2 border-gray-200 rounded-lg p-2
-         focus:border-blue-500 focus:outline-none transition-colors;
+  @apply text-right font-mono font-bold text-base text-gray-900
+         bg-white border-2 border-gray-400 rounded-lg px-2 py-2
+         focus:border-blue-600 focus:ring-2 focus:ring-blue-100
+         focus:outline-none transition-all
+         placeholder-gray-300;
+}
+.input-currency:hover {
+  @apply border-gray-500;
+}
+
+/* ── 金額入力（テーブルセル用・コンパクト） ───────────────── */
+.input-num {
+  @apply text-right font-mono font-semibold text-sm text-gray-900
+         bg-white border-2 border-gray-400 rounded-md px-1.5 py-1
+         focus:border-blue-600 focus:ring-2 focus:ring-blue-100
+         focus:outline-none transition-all w-full
+         placeholder-gray-300;
+}
+.input-num:hover {
+  @apply border-gray-500;
+}
+
+/* 補助額（緑系ボーダー） */
+.input-num-green {
+  @apply input-num border-green-400 focus:border-green-600 focus:ring-green-100;
+}
+
+/* 実支出（青系ボーダー） */
+.input-num-blue {
+  @apply input-num border-blue-400 focus:border-blue-600 focus:ring-blue-100;
+}
+
+/* 人数入力（小さいセル用） */
+.input-count {
+  @apply text-center font-mono font-semibold text-sm text-gray-900
+         bg-white border-2 border-gray-400 rounded-md px-1 py-1
+         focus:border-blue-600 focus:ring-2 focus:ring-blue-100
+         focus:outline-none transition-all w-full
+         placeholder-gray-300;
 }
 
 .section-card {
   @apply bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-4;
+}
+
+/* ── 汎用セレクト ─────────────────────────────────────── */
+select.input-select {
+  @apply text-sm text-gray-800 bg-white border-2 border-gray-400 rounded-lg
+         px-2 py-1.5 focus:border-blue-600 focus:outline-none transition-all;
 }
