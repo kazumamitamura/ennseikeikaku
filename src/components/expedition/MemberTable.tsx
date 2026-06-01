@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Plus, Trash2, ClipboardPaste, Users } from 'lucide-react';
+import { Plus, Trash2, ClipboardPaste, Users, CheckSquare } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
@@ -21,6 +21,8 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [pastePreview, setPastePreview] = useState<ReturnType<typeof parseMemberPaste>>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   const updateMember = (index: number, field: keyof Member, value: string | number | boolean) => {
     const updated = [...members];
@@ -46,7 +48,31 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
   };
 
   const removeMember = (index: number) => {
+    const removed = members[index];
+    setSelectedIds(prev => { const s = new Set(prev); s.delete(removed.id); return s; });
     onChange(members.filter((_, i) => i !== index));
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const s = new Set(prev);
+      if (s.has(id)) s.delete(id); else s.add(id);
+      return s;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === members.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(members.map(m => m.id)));
+    }
+  };
+
+  const bulkDelete = () => {
+    onChange(members.filter(m => !selectedIds.has(m.id)));
+    setSelectedIds(new Set());
+    setConfirmDeleteOpen(false);
   };
 
   const handlePasteTextChange = (text: string) => {
@@ -92,48 +118,109 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
   };
 
   const selfPaymentTotal = members.reduce((sum, m) => sum + m.self_payment, 0);
+  const allSelected = members.length > 0 && selectedIds.size === members.length;
+  const someSelected = selectedIds.size > 0;
+
+  const roleGroups: Record<MemberRole, Member[]> = {
+    athlete: [], second: [], supporter: [], staff: [], advisor: [], external_coach: [],
+  };
+  members.forEach(m => roleGroups[m.role].push(m));
 
   return (
     <Card title="② 参加者・個人負担">
       {!readOnly && (
         <p className="text-xs text-gray-500 mb-3">
-          Excel等の縦列をコピーして表内に貼り付けると、1行ずつ自動で追加されます。
+          Excel等の縦列をコピーして表内に貼り付けると自動追加されます。
           形式: 氏名 / 氏名+Tab+役職 / 氏名+Tab+役職+Tab+体重+Tab+自己負担
         </p>
+      )}
+
+      {/* 一括操作バー */}
+      {!readOnly && someSelected && (
+        <div className="flex items-center gap-3 mb-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+          <span className="text-sm font-medium text-red-700">{selectedIds.size}名を選択中</span>
+          <Button variant="danger" size="sm" onClick={() => setConfirmDeleteOpen(true)}>
+            <Trash2 className="w-3 h-3 mr-1" />
+            選択した{selectedIds.size}名を削除
+          </Button>
+          <button
+            className="text-xs text-gray-500 underline ml-auto"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            選択を解除
+          </button>
+        </div>
       )}
 
       <div className="overflow-x-auto" onPaste={handleTablePaste}>
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 text-left text-gray-600">
-              <th className="pb-2 pr-2">氏名</th>
-              <th className="pb-2 pr-2">役職</th>
-              <th className="pb-2 pr-2 text-right">自己負担額</th>
+            <tr className="border-b-2 border-gray-300 bg-gray-50 text-gray-700">
+              {!readOnly && (
+                <th className="pb-2 pr-2 w-8">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 cursor-pointer accent-primary"
+                    title="全選択/全解除"
+                  />
+                </th>
+              )}
+              <th className="pb-2 pr-2 text-left w-6 text-gray-400">#</th>
+              <th className="pb-2 pr-2 text-left">氏名</th>
+              <th className="pb-2 pr-2 text-left">役職</th>
+              <th className="pb-2 pr-2 text-right">自己負担</th>
               <th className="pb-2 pr-2 text-right">補助額</th>
-              <th className="pb-2 pr-2">備考</th>
-              {!readOnly && <th className="pb-2 w-10"></th>}
+              <th className="pb-2 pr-2 text-left hidden sm:table-cell">備考</th>
+              {!readOnly && <th className="pb-2 w-8"></th>}
             </tr>
           </thead>
           <tbody>
             {members.map((member, index) => (
-              <tr key={member.id} className="border-b border-gray-100">
-                <td className="py-2 pr-2">
+              <tr
+                key={member.id}
+                className={`border-b border-gray-100 ${selectedIds.has(member.id) ? 'bg-red-50' : 'hover:bg-gray-50'}`}
+              >
+                {!readOnly && (
+                  <td className="py-1.5 pr-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(member.id)}
+                      onChange={() => toggleSelect(member.id)}
+                      className="w-4 h-4 cursor-pointer accent-primary"
+                    />
+                  </td>
+                )}
+                <td className="py-1.5 pr-2 text-gray-400 text-xs">{index + 1}</td>
+                <td className="py-1.5 pr-2">
                   {readOnly ? member.name : (
                     <input
                       type="text"
                       value={member.name}
                       onChange={(e) => updateMember(index, 'name', e.target.value)}
-                      className="w-full border rounded px-2 py-1"
+                      className="w-full border rounded px-2 py-1 text-sm focus:border-primary focus:outline-none"
                       placeholder="氏名"
                     />
                   )}
                 </td>
-                <td className="py-2 pr-2">
-                  {readOnly ? MEMBER_ROLE_LABELS[member.role] : (
+                <td className="py-1.5 pr-2">
+                  {readOnly ? (
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                      member.role === 'athlete' ? 'bg-blue-100 text-blue-800' :
+                      member.role === 'second' ? 'bg-cyan-100 text-cyan-800' :
+                      member.role === 'supporter' ? 'bg-green-100 text-green-800' :
+                      member.role === 'staff' ? 'bg-orange-100 text-orange-800' :
+                      member.role === 'advisor' ? 'bg-purple-100 text-purple-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {MEMBER_ROLE_LABELS[member.role]}
+                    </span>
+                  ) : (
                     <select
                       value={member.role}
                       onChange={(e) => updateMember(index, 'role', e.target.value)}
-                      className="border rounded px-2 py-1"
+                      className="border rounded px-2 py-1 text-sm focus:border-primary focus:outline-none"
                     >
                       {Object.entries(MEMBER_ROLE_LABELS).map(([val, label]) => (
                         <option key={val} value={val}>{label}</option>
@@ -141,8 +228,10 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
                     </select>
                   )}
                 </td>
-                <td className="py-2 pr-2">
-                  {readOnly ? formatCurrency(member.self_payment) : (
+                <td className="py-1.5 pr-2 text-right">
+                  {readOnly ? (
+                    <span className="font-mono">{formatCurrency(member.self_payment)}</span>
+                  ) : (
                     <input
                       type="number"
                       inputMode="numeric"
@@ -152,8 +241,10 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
                     />
                   )}
                 </td>
-                <td className="py-2 pr-2">
-                  {readOnly ? formatCurrency(member.subsidy_amount) : (
+                <td className="py-1.5 pr-2 text-right">
+                  {readOnly ? (
+                    <span className="font-mono">{formatCurrency(member.subsidy_amount)}</span>
+                  ) : (
                     <input
                       type="number"
                       inputMode="numeric"
@@ -163,21 +254,22 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
                     />
                   )}
                 </td>
-                <td className="py-2 pr-2">
+                <td className="py-1.5 pr-2 hidden sm:table-cell">
                   {readOnly ? (member.notes || '') : (
                     <input
                       type="text"
                       value={member.notes || ''}
                       onChange={(e) => updateMember(index, 'notes', e.target.value)}
-                      className="w-full border rounded px-2 py-1"
+                      className="w-full border rounded px-2 py-1 text-sm focus:border-primary focus:outline-none"
                     />
                   )}
                 </td>
                 {!readOnly && (
-                  <td className="py-2">
+                  <td className="py-1.5">
                     <button
                       onClick={() => removeMember(index)}
-                      className="text-danger hover:bg-red-50 p-1 rounded"
+                      className="text-gray-400 hover:text-danger hover:bg-red-50 p-1 rounded transition-colors"
+                      title="削除"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -199,14 +291,32 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
             <ClipboardPaste className="w-4 h-4 mr-1" />
             一括追加（貼り付け）
           </Button>
+          {someSelected && (
+            <Button variant="danger" size="sm" onClick={() => setConfirmDeleteOpen(true)}>
+              <Trash2 className="w-4 h-4 mr-1" />
+              選択{selectedIds.size}名を削除
+            </Button>
+          )}
         </div>
       )}
 
-      <div className="mt-4 pt-3 border-t flex justify-between text-sm font-medium">
-        <span>自己負担合計: {formatCurrency(selfPaymentTotal)}</span>
-        <span>人数: {members.length}名</span>
+      {/* 役職別集計 */}
+      <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-600">
+        {(Object.entries(roleGroups) as [MemberRole, Member[]][])
+          .filter(([, ms]) => ms.length > 0)
+          .map(([role, ms]) => (
+            <span key={role} className="bg-gray-100 px-2 py-0.5 rounded">
+              {MEMBER_ROLE_LABELS[role]}: {ms.length}名
+            </span>
+          ))}
       </div>
 
+      <div className="mt-3 pt-3 border-t flex justify-between items-center text-sm font-medium">
+        <span className="text-gray-700">自己負担合計: <span className="font-mono text-primary">{formatCurrency(selfPaymentTotal)}</span></span>
+        <span className="text-gray-500">計 {members.length}名</span>
+      </div>
+
+      {/* 一括追加モーダル */}
       <Modal isOpen={pasteOpen} onClose={() => setPasteOpen(false)} title="名簿一括追加" size="lg">
         <p className="text-sm text-gray-600 mb-3">
           Excelやスプレッドシートからコピーした内容を貼り付けてください。改行ごとに1名として追加されます。
@@ -242,6 +352,25 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
           <Button variant="secondary" onClick={() => setPasteOpen(false)}>キャンセル</Button>
           <Button onClick={confirmBulkAdd} disabled={pastePreview.length === 0}>
             {pastePreview.length}名を追加
+          </Button>
+        </div>
+      </Modal>
+
+      {/* 一括削除確認モーダル */}
+      <Modal isOpen={confirmDeleteOpen} onClose={() => setConfirmDeleteOpen(false)} title="一括削除の確認" size="sm">
+        <p className="text-gray-700 mb-2">
+          選択した <span className="font-bold text-danger">{selectedIds.size}名</span> を削除しますか？
+        </p>
+        <ul className="text-sm text-gray-600 mb-4 max-h-40 overflow-y-auto bg-gray-50 rounded p-2">
+          {members.filter(m => selectedIds.has(m.id)).map(m => (
+            <li key={m.id}>・{m.name}（{MEMBER_ROLE_LABELS[m.role]}）</li>
+          ))}
+        </ul>
+        <div className="flex gap-2 justify-end">
+          <Button variant="secondary" onClick={() => setConfirmDeleteOpen(false)}>キャンセル</Button>
+          <Button variant="danger" onClick={bulkDelete}>
+            <CheckSquare className="w-4 h-4 mr-1" />
+            {selectedIds.size}名を削除
           </Button>
         </div>
       </Modal>
