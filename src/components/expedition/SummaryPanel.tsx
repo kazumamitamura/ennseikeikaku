@@ -9,6 +9,9 @@ import type {
   Expedition, Member, IncomeItem, AccommodationCost,
   MealCost, TransportCost, OtherCost
 } from '@/types/expedition';
+import type {
+  MemberMealRecord, MemberTransportRecord, MemberAccommodationRecord,
+} from '@/types/expedition';
 
 interface SummaryPanelProps {
   summary: ExpeditionSummary;
@@ -19,6 +22,9 @@ interface SummaryPanelProps {
   mealCosts: MealCost[];
   transportCosts: TransportCost[];
   otherCosts: OtherCost[];
+  mealRecords?: MemberMealRecord[];
+  memberTransport?: MemberTransportRecord[];
+  memberAccommodation?: MemberAccommodationRecord[];
 }
 
 export default function SummaryPanel({
@@ -30,6 +36,9 @@ export default function SummaryPanel({
   mealCosts,
   transportCosts,
   otherCosts,
+  mealRecords,
+  memberTransport,
+  memberAccommodation,
 }: SummaryPanelProps) {
   const isPositive = summary.balance >= 0;
 
@@ -114,6 +123,9 @@ export default function SummaryPanel({
         transportCosts={transportCosts}
         otherCosts={otherCosts}
         summary={summary}
+        mealRecords={mealRecords}
+        memberTransport={memberTransport}
+        memberAccommodation={memberAccommodation}
       />
     </div>
   );

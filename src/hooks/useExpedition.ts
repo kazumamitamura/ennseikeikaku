@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type {
   Expedition, Member, IncomeItem, AccommodationCost,
-  MealCost, TransportCost, OtherCost, ExpeditionFullData
+  MealCost, TransportCost, OtherCost, ExpeditionFullData,
+  MemberMealRecord, MemberTransportRecord, MemberAccommodationRecord,
 } from '@/types/expedition';
 
 export function useExpedition(id: string) {
@@ -18,7 +19,10 @@ export function useExpedition(id: string) {
     setError(null);
 
     try {
-      const [expRes, memRes, incRes, accRes, mealRes, transRes, otherRes] = await Promise.all([
+      const [
+        expRes, memRes, incRes, accRes, mealRes, transRes, otherRes,
+        mealRecRes, transRecRes, accRecRes,
+      ] = await Promise.all([
         supabase.from('expeditions').select('*').eq('id', id).single(),
         supabase.from('members').select('*').eq('expedition_id', id).order('sort_order'),
         supabase.from('income_items').select('*').eq('expedition_id', id),
@@ -26,6 +30,9 @@ export function useExpedition(id: string) {
         supabase.from('meal_costs').select('*').eq('expedition_id', id).order('date'),
         supabase.from('transport_costs').select('*').eq('expedition_id', id).order('sort_order'),
         supabase.from('other_costs').select('*').eq('expedition_id', id).order('sort_order'),
+        supabase.from('member_meal_records').select('*').eq('expedition_id', id),
+        supabase.from('member_transport_records').select('*').eq('expedition_id', id).order('sort_order'),
+        supabase.from('member_accommodation_records').select('*').eq('expedition_id', id),
       ]);
 
       if (expRes.error) throw expRes.error;
@@ -38,6 +45,9 @@ export function useExpedition(id: string) {
         mealCosts: (mealRes.data || []) as MealCost[],
         transportCosts: (transRes.data || []) as TransportCost[],
         otherCosts: (otherRes.data || []) as OtherCost[],
+        memberMealRecords: (mealRecRes.data || []) as MemberMealRecord[],
+        memberTransportRecords: (transRecRes.data || []) as MemberTransportRecord[],
+        memberAccommodationRecords: (accRecRes.data || []) as MemberAccommodationRecord[],
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'データの取得に失敗しました');

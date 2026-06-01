@@ -21,6 +21,9 @@ const ROLE_ALIASES: Record<string, MemberRole> = {
   応援: 'supporter',
   引率: 'staff',
   顧問: 'advisor',
+  外部: 'external_coach',
+  外部指導: 'external_coach',
+  external_coach: 'external_coach',
 };
 
 function parseRole(value?: string): MemberRole {

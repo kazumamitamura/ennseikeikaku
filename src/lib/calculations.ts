@@ -1,59 +1,128 @@
 import type {
   Member, IncomeItem, AccommodationCost, MealCost,
-  TransportCost, OtherCost, ExpeditionSummary, IncomeCategory, ExpenseSplit
+  TransportCost, OtherCost, ExpeditionSummary, IncomeCategory, ExpenseSplit,
+  MemberMealRecord, MemberTransportRecord, MemberAccommodationRecord,
+  PersonExpenseDetail, MealType, MealStatus
 } from '@/types/expedition';
-import { getLodgingStudentCount, getStaffCount } from '@/lib/memberRoles';
+import {
+  getLodgingStudentCount, getMealUnitPrice, getMealStatus,
+  isStudentRole, needsIndividualTracking, getStudentMembers, getIndividualMembers,
+  INDIVIDUAL_EXPENSE_ROLES
+} from '@/lib/memberRoles';
+import { GROUP_TRANSPORT_TYPES } from '@/types/expedition';
 
-function getMealStudentCount(meal: MealCost): number {
-  return meal.student_count ?? meal.target_count ?? 0;
+const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner'];
+
+function calcStudentGroupAccommodation(
+  accommodation: AccommodationCost,
+  members: Member[]
+): number {
+  const studentCount = getLodgingStudentCount(members);
+  const unitCost = accommodation.unit_price + accommodation.breakfast_price;
+  const gross = unitCost * studentCount * accommodation.nights;
+  const subsidy = accommodation.subsidy_per_person * studentCount * accommodation.nights;
+  return gross - subsidy;
 }
 
-function getMealStaffCount(meal: MealCost): number {
-  return meal.staff_count ?? meal.non_target_count ?? 0;
+function calcStaffAccommodationRecords(records: MemberAccommodationRecord[]): number {
+  return records.reduce((sum, r) => {
+    const gross = (r.unit_price + r.breakfast_price) * r.nights;
+    return sum + gross - r.subsidy_amount;
+  }, 0);
 }
 
-function getMealStaffUnitPrice(meal: MealCost): number {
-  return meal.staff_unit_price ?? meal.unit_price ?? 0;
-}
+function calcMealsFromMatrix(
+  members: Member[],
+  mealRecords: MemberMealRecord[],
+  mealCosts: MealCost[],
+  dates: string[]
+): ExpenseSplit {
+  let student = 0;
+  let staff = 0;
 
-function calcMealRowTotal(meal: MealCost): { student: number; staff: number } {
-  const student = getMealStudentCount(meal) * (meal.unit_price ?? 0);
-  const staff = getMealStaffCount(meal) * getMealStaffUnitPrice(meal);
-  return { student, staff };
-}
+  for (const date of dates) {
+    for (const mealType of MEAL_TYPES) {
+      const studentPrice = getMealUnitPrice(mealCosts, date, mealType, false);
+      const staffPrice = getMealUnitPrice(mealCosts, date, mealType, true);
 
-function calcTransportRow(cost: TransportCost): ExpenseSplit {
-  const student = cost.student_amount ?? 0;
-  const staff = cost.staff_amount ?? 0;
-  if (student === 0 && staff === 0) {
-    const legacy = cost.per_person ? cost.amount * cost.person_count : cost.amount;
-    return { student: legacy, staff: 0, total: legacy };
+      for (const m of getStudentMembers(members)) {
+        const status = getMealStatus(mealRecords, m.id, date, mealType);
+        if (status === 'eat') student += studentPrice;
+      }
+      for (const m of getIndividualMembers(members)) {
+        const status = getMealStatus(mealRecords, m.id, date, mealType);
+        if (status === 'eat') staff += staffPrice;
+      }
+    }
   }
   return { student, staff, total: student + staff };
 }
 
-function calcAccommodationSplit(
-  accommodation: AccommodationCost,
-  members: Member[]
-): ExpenseSplit {
-  const studentCount = getLodgingStudentCount(members);
-  const staffCount = getStaffCount(members);
-  const nights = accommodation.nights;
-
-  const studentUnit = accommodation.unit_price + accommodation.breakfast_price;
-  const staffUnit =
-    (accommodation.staff_unit_price ?? accommodation.unit_price) +
-    (accommodation.staff_breakfast_price ?? accommodation.breakfast_price);
-
-  const studentGross = studentUnit * studentCount * nights;
-  const staffGross = staffUnit * staffCount * nights;
-  const studentSubsidy = accommodation.subsidy_per_person * studentCount * nights;
-  const staffSubsidy =
-    (accommodation.staff_subsidy_per_person ?? 0) * staffCount * nights;
-
-  const student = studentGross - studentSubsidy;
-  const staff = staffGross - staffSubsidy;
+function calcLegacyMeals(mealCosts: MealCost[]): ExpenseSplit {
+  const student = mealCosts.reduce((sum, m) => {
+    const sc = m.student_count ?? m.target_count ?? 0;
+    return sum + sc * (m.unit_price ?? 0);
+  }, 0);
+  const staff = mealCosts.reduce((sum, m) => {
+    const st = m.staff_count ?? m.non_target_count ?? 0;
+    const price = m.staff_unit_price ?? m.unit_price ?? 0;
+    return sum + st * price;
+  }, 0);
   return { student, staff, total: student + staff };
+}
+
+function calcGroupTransport(transportCosts: TransportCost[]): number {
+  return transportCosts
+    .filter(t => GROUP_TRANSPORT_TYPES.includes(t.transport_type))
+    .reduce((sum, t) => {
+      const student = t.student_amount ?? 0;
+      const staff = t.staff_amount ?? 0;
+      if (student === 0 && staff === 0) {
+        return sum + (t.per_person ? t.amount * t.person_count : t.amount);
+      }
+      return sum + student + staff;
+    }, 0);
+}
+
+function calcIndividualTransport(records: MemberTransportRecord[]): number {
+  return records.reduce((sum, r) => sum + r.amount, 0);
+}
+
+export function calcPersonExpenseDetails(
+  members: Member[],
+  mealRecords: MemberMealRecord[],
+  mealCosts: MealCost[],
+  accommodationRecords: MemberAccommodationRecord[],
+  transportRecords: MemberTransportRecord[],
+  dates: string[]
+): PersonExpenseDetail[] {
+  return getIndividualMembers(members).map(m => {
+    let mealTotal = 0;
+    for (const date of dates) {
+      for (const mealType of MEAL_TYPES) {
+        if (getMealStatus(mealRecords, m.id, date, mealType) === 'eat') {
+          mealTotal += getMealUnitPrice(mealCosts, date, mealType, true);
+        }
+      }
+    }
+    const acc = accommodationRecords.find(r => r.member_id === m.id);
+    const accommodationTotal = acc
+      ? (acc.unit_price + acc.breakfast_price) * acc.nights - acc.subsidy_amount
+      : 0;
+    const transportTotal = transportRecords
+      .filter(r => r.member_id === m.id)
+      .reduce((s, r) => s + r.amount, 0);
+
+    return {
+      memberId: m.id,
+      memberName: m.name,
+      role: m.role,
+      mealTotal,
+      accommodationTotal,
+      transportTotal,
+      total: mealTotal + accommodationTotal + transportTotal,
+    };
+  });
 }
 
 export function calculateSummary(
@@ -62,7 +131,11 @@ export function calculateSummary(
   accommodation: AccommodationCost | null,
   mealCosts: MealCost[],
   transportCosts: TransportCost[],
-  otherCosts: OtherCost[]
+  otherCosts: OtherCost[],
+  memberMealRecords: MemberMealRecord[] = [],
+  memberTransportRecords: MemberTransportRecord[] = [],
+  memberAccommodationRecords: MemberAccommodationRecord[] = [],
+  dates: string[] = []
 ): ExpeditionSummary {
   const totalIncome = incomeItems.reduce((sum, item) => sum + item.amount, 0);
   const incomeByCategory = incomeItems.reduce((acc, item) => {
@@ -70,33 +143,25 @@ export function calculateSummary(
     return acc;
   }, {} as Record<string, number>);
 
-  const accommodationSplit: ExpenseSplit = accommodation
-    ? calcAccommodationSplit(accommodation, members)
-    : { student: 0, staff: 0, total: 0 };
+  const studentAcc = accommodation ? calcStudentGroupAccommodation(accommodation, members) : 0;
+  const staffAcc = calcStaffAccommodationRecords(memberAccommodationRecords);
+  const accommodationSplit: ExpenseSplit = {
+    student: studentAcc,
+    staff: staffAcc,
+    total: studentAcc + staffAcc,
+  };
 
-  const mealSplit = mealCosts.reduce(
-    (acc, meal) => {
-      const row = calcMealRowTotal(meal);
-      return {
-        student: acc.student + row.student,
-        staff: acc.staff + row.staff,
-        total: acc.total + row.student + row.staff,
-      };
-    },
-    { student: 0, staff: 0, total: 0 }
-  );
+  const mealSplit = memberMealRecords.length > 0 && dates.length > 0
+    ? calcMealsFromMatrix(members, memberMealRecords, mealCosts, dates)
+    : calcLegacyMeals(mealCosts);
 
-  const transportSplit = transportCosts.reduce(
-    (acc, t) => {
-      const row = calcTransportRow(t);
-      return {
-        student: acc.student + row.student,
-        staff: acc.staff + row.staff,
-        total: acc.total + row.total,
-      };
-    },
-    { student: 0, staff: 0, total: 0 }
-  );
+  const groupTransport = calcGroupTransport(transportCosts);
+  const individualTransport = calcIndividualTransport(memberTransportRecords);
+  const transportSplit: ExpenseSplit = {
+    student: groupTransport,
+    staff: individualTransport,
+    total: groupTransport + individualTransport,
+  };
 
   const otherTotal = otherCosts.reduce((sum, o) => sum + o.amount, 0);
   const memberSelfPaymentTotal = members.reduce((sum, m) => sum + m.self_payment, 0);
@@ -143,7 +208,12 @@ export const formatDate = (dateStr: string): string => {
 export const formatDateWithDay = (dateStr: string): string => {
   const date = new Date(dateStr);
   const days = ['日', '月', '火', '水', '木', '金', '土'];
-  return `${date.getMonth() + 1}月${date.getDate()}日(${days[date.getDay()]})`;
+  return `${date.getMonth() + 1}/${date.getDate()}(${days[date.getDay()]})`;
+};
+
+export const formatDateShort = (dateStr: string): string => {
+  const date = new Date(dateStr);
+  return `${date.getMonth() + 1}/${date.getDate()}`;
 };
 
 export const toReiwaYear = (year: number): number => year - 2018;
@@ -166,19 +236,6 @@ export function getDateRange(startDate: string, endDate: string): string[] {
   return dates;
 }
 
-export function normalizeMealCost(meal: MealCost): MealCost {
-  return {
-    ...meal,
-    student_count: getMealStudentCount(meal),
-    staff_count: getMealStaffCount(meal),
-    subsidy_student_count: meal.subsidy_student_count ?? meal.subsidy_count ?? 0,
-    staff_unit_price: meal.staff_unit_price ?? meal.unit_price ?? 0,
-    target_count: getMealStudentCount(meal),
-    non_target_count: getMealStaffCount(meal),
-    subsidy_count: meal.subsidy_student_count ?? meal.subsidy_count ?? 0,
-  };
-}
-
 export function syncMealLegacyFields(meal: MealCost, field: string, value: number): MealCost {
   const updated = { ...meal, [field]: value };
   if (field === 'student_count') updated.target_count = value;
@@ -186,3 +243,11 @@ export function syncMealLegacyFields(meal: MealCost, field: string, value: numbe
   if (field === 'subsidy_student_count') updated.subsidy_count = value;
   return updated;
 }
+
+export function cycleMealStatus(current: MealStatus): MealStatus {
+  if (current === 'eat') return 'skip';
+  if (current === 'skip') return 'none';
+  return 'eat';
+}
+
+export { MEAL_TYPES, INDIVIDUAL_EXPENSE_ROLES, isStudentRole, needsIndividualTracking };

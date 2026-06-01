@@ -27,7 +27,12 @@ export default function ReportPage({ params }: PageProps) {
     data?.accommodation ?? null,
     data?.mealCosts ?? [],
     data?.transportCosts ?? [],
-    data?.otherCosts ?? []
+    data?.otherCosts ?? [],
+    data?.memberMealRecords ?? [],
+    data?.memberTransportRecords ?? [],
+    data?.memberAccommodationRecords ?? [],
+    data?.expedition.start_date,
+    data?.expedition.end_date
   );
 
   if (loading) {
@@ -95,6 +100,9 @@ export default function ReportPage({ params }: PageProps) {
               transportCosts={data.transportCosts}
               otherCosts={data.otherCosts}
               summary={summary}
+              mealRecords={data.memberMealRecords}
+              memberTransport={data.memberTransportRecords}
+              memberAccommodation={data.memberAccommodationRecords}
             />
           </Card>
         </div>

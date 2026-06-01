@@ -1,5 +1,7 @@
 export type VehicleType = 'microbus' | 'two_cars';
-export type MemberRole = 'athlete' | 'second' | 'supporter' | 'staff' | 'advisor';
+export type MemberRole = 'athlete' | 'second' | 'supporter' | 'staff' | 'advisor' | 'external_coach';
+export type MealStatus = 'eat' | 'skip' | 'none';
+export type IndividualTransportType = 'flight' | 'shinkansen' | 'train' | 'bus';
 export type ExpeditionStatus = 'draft' | 'confirmed' | 'settled';
 export type MealType = 'breakfast' | 'lunch' | 'dinner';
 export type TransportType =
@@ -104,6 +106,52 @@ export interface OtherCost {
   sort_order: number;
 }
 
+export interface MemberMealRecord {
+  id: string;
+  expedition_id: string;
+  member_id: string;
+  date: string;
+  breakfast_status: MealStatus;
+  lunch_status: MealStatus;
+  dinner_status: MealStatus;
+}
+
+export interface MemberTransportRecord {
+  id: string;
+  expedition_id: string;
+  member_id: string;
+  transport_type: IndividualTransportType;
+  label: string;
+  amount: number;
+  travel_date?: string;
+  notes?: string;
+  sort_order: number;
+}
+
+export interface MemberAccommodationRecord {
+  id: string;
+  expedition_id: string;
+  member_id: string;
+  plan_type: string;
+  unit_price: number;
+  breakfast_price: number;
+  nights: number;
+  start_date?: string;
+  end_date?: string;
+  subsidy_amount: number;
+  notes?: string;
+}
+
+export interface PersonExpenseDetail {
+  memberId: string;
+  memberName: string;
+  role: MemberRole;
+  mealTotal: number;
+  accommodationTotal: number;
+  transportTotal: number;
+  total: number;
+}
+
 export interface ExpenseSplit {
   student: number;
   staff: number;
@@ -141,6 +189,9 @@ export interface ExpeditionFullData {
   mealCosts: MealCost[];
   transportCosts: TransportCost[];
   otherCosts: OtherCost[];
+  memberMealRecords: MemberMealRecord[];
+  memberTransportRecords: MemberTransportRecord[];
+  memberAccommodationRecords: MemberAccommodationRecord[];
 }
 
 export const MEMBER_ROLE_LABELS: Record<MemberRole, string> = {
@@ -149,7 +200,28 @@ export const MEMBER_ROLE_LABELS: Record<MemberRole, string> = {
   supporter: '応援',
   staff: '引率',
   advisor: '顧問',
+  external_coach: '外部指導',
 };
+
+export const MEAL_STATUS_LABELS: Record<MealStatus, string> = {
+  eat: '食事',
+  skip: '欠食',
+  none: '対象外',
+};
+
+export const INDIVIDUAL_TRANSPORT_LABELS: Record<IndividualTransportType, string> = {
+  flight: '飛行機',
+  shinkansen: '新幹線',
+  train: '電車',
+  bus: 'バス',
+};
+
+/** 共通費用（個別計算不要） */
+export const GROUP_TRANSPORT_TYPES: TransportType[] = [
+  'rental_car', 'travel_agency', 'fuel', 'taxi', 'charter', 'highway', 'parking', 'other',
+];
+
+export const ACCOMMODATION_PLAN_OPTIONS = ['1泊1食', '1泊2食', '素泊まり', '朝食付き'] as const;
 
 export const STATUS_LABELS: Record<ExpeditionStatus, string> = {
   draft: '作成中',

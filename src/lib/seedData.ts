@@ -47,15 +47,13 @@ export const SAMPLE_ACCOMMODATION = {
 export const SAMPLE_MEAL_DATES = ['2026-06-19', '2026-06-20', '2026-06-21'];
 export const SAMPLE_MEAL_PRICES = { breakfast: 864, lunch: 900, dinner: 435 };
 
-export const DEFAULT_TRANSPORT_TYPES: { type: TransportType; label: string; student_amount: number; staff_amount: number }[] = [
-  { type: 'rental_car', label: 'レンタカー', student_amount: 0, staff_amount: 0 },
-  { type: 'travel_agency', label: '旅行代', student_amount: 0, staff_amount: 0 },
-  { type: 'fuel', label: '燃料代', student_amount: 40000, staff_amount: 5000 },
-  { type: 'shinkansen', label: '新幹線代', student_amount: 0, staff_amount: 0 },
-  { type: 'train', label: '電車代', student_amount: 0, staff_amount: 0 },
-  { type: 'taxi', label: 'タクシー代', student_amount: 0, staff_amount: 0 },
-  { type: 'charter', label: 'チャーター代', student_amount: 0, staff_amount: 0 },
-  { type: 'highway', label: '高速道路代', student_amount: 22000, staff_amount: 3000 },
-  { type: 'parking', label: '駐車代', student_amount: 2500, staff_amount: 500 },
-  { type: 'other', label: 'その他', student_amount: 0, staff_amount: 0 },
+export const DEFAULT_TRANSPORT_TYPES: { type: TransportType; label: string; amount: number }[] = [
+  { type: 'rental_car', label: 'レンタカー', amount: 0 },
+  { type: 'travel_agency', label: '旅行代', amount: 0 },
+  { type: 'fuel', label: '燃料代', amount: 45000 },
+  { type: 'taxi', label: 'タクシー代', amount: 0 },
+  { type: 'charter', label: 'チャーター代', amount: 0 },
+  { type: 'highway', label: '高速道路代', amount: 25000 },
+  { type: 'parking', label: '駐車代', amount: 3000 },
+  { type: 'other', label: 'その他', amount: 0 },
 ];

@@ -66,9 +66,9 @@ async function seedExpeditionData(supabase: SupabaseClient, expeditionId: string
         expedition_id: expeditionId,
         transport_type: t.type,
         label: t.label,
-        amount: t.student_amount + t.staff_amount,
-        student_amount: t.student_amount,
-        staff_amount: t.staff_amount,
+        amount: t.amount,
+        student_amount: t.amount,
+        staff_amount: 0,
         per_person: false,
         person_count: 1,
         sort_order: i,
@@ -102,13 +102,11 @@ async function createDefaultData(supabase: SupabaseClient, expeditionId: string)
   );
 
   const transportTypes = [
-    'rental_car', 'travel_agency', 'fuel', 'shinkansen', 'train',
-    'taxi', 'charter', 'highway', 'parking', 'other',
+    'rental_car', 'travel_agency', 'fuel', 'taxi', 'charter', 'highway', 'parking', 'other',
   ];
   const transportLabels: Record<string, string> = {
     rental_car: 'レンタカー', travel_agency: '旅行代', fuel: '燃料代',
-    shinkansen: '新幹線代', train: '電車代', taxi: 'タクシー代',
-    charter: 'チャーター代', highway: '高速道路代', parking: '駐車代', other: 'その他',
+    taxi: 'タクシー代', charter: 'チャーター代', highway: '高速道路代', parking: '駐車代', other: 'その他',
   };
 
   await assertSupabaseOk(
