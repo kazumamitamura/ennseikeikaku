@@ -52,6 +52,9 @@ CREATE TABLE accommodation_costs (
   breakfast_price INTEGER DEFAULT 0,
   nights INTEGER DEFAULT 1,
   subsidy_per_person INTEGER DEFAULT 0,
+  staff_unit_price INTEGER DEFAULT 0,
+  staff_breakfast_price INTEGER DEFAULT 0,
+  staff_subsidy_per_person INTEGER DEFAULT 0,
   notes TEXT
 );
 
@@ -65,6 +68,10 @@ CREATE TABLE meal_costs (
   non_target_count INTEGER DEFAULT 0,
   subsidy_count INTEGER DEFAULT 0,
   unit_price INTEGER DEFAULT 0,
+  student_count INTEGER DEFAULT 0,
+  staff_count INTEGER DEFAULT 0,
+  staff_unit_price INTEGER DEFAULT 0,
+  subsidy_student_count INTEGER DEFAULT 0,
   notes TEXT
 );
 
@@ -75,6 +82,8 @@ CREATE TABLE transport_costs (
   transport_type TEXT NOT NULL,
   label TEXT NOT NULL,
   amount INTEGER DEFAULT 0,
+  student_amount INTEGER DEFAULT 0,
+  staff_amount INTEGER DEFAULT 0,
   per_person BOOLEAN DEFAULT false,
   person_count INTEGER DEFAULT 1,
   notes TEXT,

@@ -1,9 +1,12 @@
 'use client';
 
-import { Plus, Trash2 } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { Plus, Trash2, ClipboardPaste, Users } from 'lucide-react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import Modal from '@/components/ui/Modal';
 import { formatCurrency, parseInteger } from '@/lib/calculations';
+import { parseMemberPaste } from '@/lib/memberImport';
 import type { Member, MemberRole } from '@/types/expedition';
 import { MEMBER_ROLE_LABELS } from '@/types/expedition';
 
@@ -15,6 +18,10 @@ interface MemberTableProps {
 }
 
 export default function MemberTable({ members, onChange, expeditionId, readOnly }: MemberTableProps) {
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  const [pastePreview, setPastePreview] = useState<ReturnType<typeof parseMemberPaste>>([]);
+
   const updateMember = (index: number, field: keyof Member, value: string | number | boolean) => {
     const updated = [...members];
     updated[index] = { ...updated[index], [field]: value };
@@ -42,11 +49,60 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
     onChange(members.filter((_, i) => i !== index));
   };
 
+  const handlePasteTextChange = (text: string) => {
+    setPasteText(text);
+    setPastePreview(parseMemberPaste(text));
+  };
+
+  const handleBulkPaste = useCallback((text: string) => {
+    const parsed = parseMemberPaste(text);
+    if (parsed.length === 0) return;
+    const newMembers: Member[] = parsed.map((row, i) => ({
+      id: `temp-${Date.now()}-${i}`,
+      expedition_id: expeditionId,
+      name: row.name,
+      role: row.role,
+      weight_class: row.weight_class,
+      participation_ih: false,
+      participation_tohoku: false,
+      self_payment: row.self_payment,
+      subsidy_amount: row.subsidy_amount,
+      notes: row.notes,
+      sort_order: members.length + i,
+    }));
+    onChange([...members, ...newMembers]);
+    setPasteOpen(false);
+    setPasteText('');
+    setPastePreview([]);
+  }, [members, expeditionId, onChange]);
+
+  const handleTablePaste = (e: React.ClipboardEvent) => {
+    if (readOnly) return;
+    const text = e.clipboardData.getData('text');
+    if (!text.includes('\n') && !text.includes('\t')) return;
+    const parsed = parseMemberPaste(text);
+    if (parsed.length <= 1 && !text.includes('\n')) return;
+    e.preventDefault();
+    handleBulkPaste(text);
+  };
+
+  const confirmBulkAdd = () => {
+    if (pastePreview.length === 0) return;
+    handleBulkPaste(pasteText);
+  };
+
   const selfPaymentTotal = members.reduce((sum, m) => sum + m.self_payment, 0);
 
   return (
     <Card title="② 参加者・個人負担">
-      <div className="overflow-x-auto">
+      {!readOnly && (
+        <p className="text-xs text-gray-500 mb-3">
+          Excel等の縦列をコピーして表内に貼り付けると、1行ずつ自動で追加されます。
+          形式: 氏名 / 氏名+Tab+役職 / 氏名+Tab+役職+Tab+体重+Tab+自己負担
+        </p>
+      )}
+
+      <div className="overflow-x-auto" onPaste={handleTablePaste}>
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 text-left text-gray-600">
@@ -132,16 +188,63 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
           </tbody>
         </table>
       </div>
+
       {!readOnly && (
-        <Button variant="secondary" size="sm" onClick={addMember} className="mt-3">
-          <Plus className="w-4 h-4 mr-1" />
-          参加者を追加
-        </Button>
+        <div className="flex flex-wrap gap-2 mt-3">
+          <Button variant="secondary" size="sm" onClick={addMember}>
+            <Plus className="w-4 h-4 mr-1" />
+            1名追加
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => setPasteOpen(true)}>
+            <ClipboardPaste className="w-4 h-4 mr-1" />
+            一括追加（貼り付け）
+          </Button>
+        </div>
       )}
+
       <div className="mt-4 pt-3 border-t flex justify-between text-sm font-medium">
         <span>自己負担合計: {formatCurrency(selfPaymentTotal)}</span>
         <span>人数: {members.length}名</span>
       </div>
+
+      <Modal isOpen={pasteOpen} onClose={() => setPasteOpen(false)} title="名簿一括追加" size="lg">
+        <p className="text-sm text-gray-600 mb-3">
+          Excelやスプレッドシートからコピーした内容を貼り付けてください。改行ごとに1名として追加されます。
+        </p>
+        <textarea
+          value={pasteText}
+          onChange={(e) => handlePasteTextChange(e.target.value)}
+          onPaste={(e) => {
+            const text = e.clipboardData.getData('text');
+            setTimeout(() => handlePasteTextChange(text), 0);
+          }}
+          placeholder={'田中太郎\n佐藤花子\n鈴木一郎\n\nまたは\n田中太郎\t選手\t73kg\t7000'}
+          className="w-full h-40 border-2 border-gray-200 rounded-lg p-3 text-sm font-mono"
+        />
+        {pastePreview.length > 0 && (
+          <div className="mt-4 bg-gray-50 rounded-lg p-3">
+            <p className="text-sm font-medium mb-2 flex items-center gap-1">
+              <Users className="w-4 h-4" />
+              プレビュー: {pastePreview.length}名
+            </p>
+            <ul className="text-sm space-y-1 max-h-32 overflow-y-auto">
+              {pastePreview.map((row, i) => (
+                <li key={i} className="text-gray-700">
+                  {row.name}（{MEMBER_ROLE_LABELS[row.role]}）
+                  {row.weight_class ? ` / ${row.weight_class}` : ''}
+                  / {formatCurrency(row.self_payment)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div className="flex gap-2 justify-end mt-4">
+          <Button variant="secondary" onClick={() => setPasteOpen(false)}>キャンセル</Button>
+          <Button onClick={confirmBulkAdd} disabled={pastePreview.length === 0}>
+            {pastePreview.length}名を追加
+          </Button>
+        </div>
+      </Modal>
     </Card>
   );
 }

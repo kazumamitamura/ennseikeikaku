@@ -51,6 +51,10 @@ async function seedExpeditionData(supabase: SupabaseClient, expeditionId: string
       target_count: 10,
       non_target_count: 0,
       subsidy_count: 10,
+      student_count: 10,
+      staff_count: 0,
+      subsidy_student_count: 10,
+      staff_unit_price: SAMPLE_MEAL_PRICES[mealType],
       unit_price: SAMPLE_MEAL_PRICES[mealType],
     }))
   );
@@ -62,7 +66,9 @@ async function seedExpeditionData(supabase: SupabaseClient, expeditionId: string
         expedition_id: expeditionId,
         transport_type: t.type,
         label: t.label,
-        amount: t.amount,
+        amount: t.student_amount + t.staff_amount,
+        student_amount: t.student_amount,
+        staff_amount: t.staff_amount,
         per_person: false,
         person_count: 1,
         sort_order: i,
@@ -89,6 +95,9 @@ async function createDefaultData(supabase: SupabaseClient, expeditionId: string)
       breakfast_price: 0,
       nights: 1,
       subsidy_per_person: 0,
+      staff_unit_price: 0,
+      staff_breakfast_price: 0,
+      staff_subsidy_per_person: 0,
     })
   );
 
@@ -109,6 +118,8 @@ async function createDefaultData(supabase: SupabaseClient, expeditionId: string)
         transport_type: type,
         label: transportLabels[type],
         amount: 0,
+        student_amount: 0,
+        staff_amount: 0,
         per_person: false,
         person_count: 1,
         sort_order: i,

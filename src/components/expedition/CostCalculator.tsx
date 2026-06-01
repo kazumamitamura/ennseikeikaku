@@ -152,6 +152,7 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
           expeditionId={expeditionId}
           startDate={expedition.start_date}
           endDate={expedition.end_date}
+          members={members}
         />
         <TransportSection
           transportCosts={transportCosts}

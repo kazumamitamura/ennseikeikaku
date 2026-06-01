@@ -56,6 +56,9 @@ export interface AccommodationCost {
   breakfast_price: number;
   nights: number;
   subsidy_per_person: number;
+  staff_unit_price?: number;
+  staff_breakfast_price?: number;
+  staff_subsidy_per_person?: number;
   notes?: string;
 }
 
@@ -64,10 +67,17 @@ export interface MealCost {
   expedition_id: string;
   date: string;
   meal_type: MealType;
+  /** @deprecated student_count を使用 */
   target_count: number;
+  /** @deprecated staff_count を使用 */
   non_target_count: number;
+  /** @deprecated subsidy_student_count を使用 */
   subsidy_count: number;
   unit_price: number;
+  student_count?: number;
+  staff_count?: number;
+  staff_unit_price?: number;
+  subsidy_student_count?: number;
   notes?: string;
 }
 
@@ -77,6 +87,8 @@ export interface TransportCost {
   transport_type: TransportType;
   label: string;
   amount: number;
+  student_amount?: number;
+  staff_amount?: number;
   per_person: boolean;
   person_count: number;
   notes?: string;
@@ -92,6 +104,12 @@ export interface OtherCost {
   sort_order: number;
 }
 
+export interface ExpenseSplit {
+  student: number;
+  staff: number;
+  total: number;
+}
+
 export interface ExpeditionSummary {
   totalIncome: number;
   totalExpense: number;
@@ -101,12 +119,16 @@ export interface ExpeditionSummary {
   transportTotal: number;
   otherTotal: number;
   memberSelfPaymentTotal: number;
+  accommodationSplit: ExpenseSplit;
+  mealSplit: ExpenseSplit;
+  transportSplit: ExpenseSplit;
   incomeByCategory: Record<IncomeCategory, number>;
   memberCount: {
     athletes: number;
     seconds: number;
     supporters: number;
     staff: number;
+    advisors: number;
     total: number;
   };
 }
