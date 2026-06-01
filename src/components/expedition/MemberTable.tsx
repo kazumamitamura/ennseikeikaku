@@ -13,16 +13,23 @@ import { MEMBER_ROLE_LABELS } from '@/types/expedition';
 interface MemberTableProps {
   members: Member[];
   onChange: (members: Member[]) => void;
+  onDelete?: (id: string) => void; // DB削除通知
   expeditionId: string;
   readOnly?: boolean;
 }
 
-export default function MemberTable({ members, onChange, expeditionId, readOnly }: MemberTableProps) {
+export default function MemberTable({ members, onChange, onDelete, expeditionId, readOnly }: MemberTableProps) {
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState('');
   const [pastePreview, setPastePreview] = useState<ReturnType<typeof parseMemberPaste>>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+  // 同姓同名チェック（名前ごとの出現回数）
+  const nameCount = members.reduce<Record<string, number>>((acc, m) => {
+    if (m.name.trim()) acc[m.name] = (acc[m.name] || 0) + 1;
+    return acc;
+  }, {});
 
   const updateMember = (index: number, field: keyof Member, value: string | number | boolean) => {
     const updated = [...members];
@@ -50,6 +57,8 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
   const removeMember = (index: number) => {
     const removed = members[index];
     setSelectedIds(prev => { const s = new Set(prev); s.delete(removed.id); return s; });
+    // DB上の実IDは CostCalculator 側で削除処理
+    if (!removed.id.startsWith('temp-') && onDelete) onDelete(removed.id);
     onChange(members.filter((_, i) => i !== index));
   };
 
@@ -70,6 +79,10 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
   };
 
   const bulkDelete = () => {
+    // DB上の実IDは CostCalculator 側で削除処理
+    if (onDelete) {
+      members.filter(m => selectedIds.has(m.id) && !m.id.startsWith('temp-')).forEach(m => onDelete(m.id));
+    }
     onChange(members.filter(m => !selectedIds.has(m.id)));
     setSelectedIds(new Set());
     setConfirmDeleteOpen(false);
@@ -135,6 +148,14 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
         </p>
       )}
 
+      {/* 未保存メンバーの案内 */}
+      {!readOnly && members.some(m => m.id.startsWith('temp-') && m.name.trim()) && (
+        <div className="flex items-center gap-2 mb-2 p-2 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-800">
+          <span className="font-medium">⏳ 未保存のメンバーがいます。</span>
+          <span>自動保存中（数秒後に確定されます）</span>
+        </div>
+      )}
+
       {/* 一括操作バー */}
       {!readOnly && someSelected && (
         <div className="flex items-center gap-3 mb-2 p-2 bg-red-50 border border-red-200 rounded-lg">
@@ -177,10 +198,18 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
             </tr>
           </thead>
           <tbody>
-            {members.map((member, index) => (
+            {members.map((member, index) => {
+            const isDraft = member.id.startsWith('temp-');
+            const isDuplicate = member.name.trim() && (nameCount[member.name] ?? 0) > 1;
+            const rowClass = selectedIds.has(member.id)
+              ? 'bg-red-50'
+              : isDraft
+              ? 'bg-amber-50'
+              : 'hover:bg-gray-50';
+            return (
               <tr
                 key={member.id}
-                className={`border-b border-gray-100 ${selectedIds.has(member.id) ? 'bg-red-50' : 'hover:bg-gray-50'}`}
+                className={`border-b border-gray-100 ${rowClass}`}
               >
                 {!readOnly && (
                   <td className="py-1.5 pr-2">
@@ -192,16 +221,29 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
                     />
                   </td>
                 )}
-                <td className="py-1.5 pr-2 text-gray-400 text-xs">{index + 1}</td>
+                <td className="py-1.5 pr-2 text-gray-400 text-xs">
+                  {index + 1}
+                  {isDraft && <span className="ml-1 text-amber-500" title="未保存">●</span>}
+                </td>
                 <td className="py-1.5 pr-2">
-                  {readOnly ? member.name : (
-                    <input
-                      type="text"
-                      value={member.name}
-                      onChange={(e) => updateMember(index, 'name', e.target.value)}
-                      className="w-full border rounded px-2 py-1 text-sm focus:border-primary focus:outline-none"
-                      placeholder="氏名"
-                    />
+                  {readOnly ? (
+                    <span>
+                      {member.name}
+                      {isDuplicate && <span className="ml-1 text-xs text-orange-500" title="同姓同名の別人が登録されています">同名</span>}
+                    </span>
+                  ) : (
+                    <div className="flex flex-col">
+                      <input
+                        type="text"
+                        value={member.name}
+                        onChange={(e) => updateMember(index, 'name', e.target.value)}
+                        className={`w-full border rounded px-2 py-1 text-sm focus:outline-none ${isDuplicate ? 'border-orange-300 focus:border-orange-500' : 'focus:border-primary'}`}
+                        placeholder="氏名"
+                      />
+                      {isDuplicate && (
+                        <span className="text-xs text-orange-500 mt-0.5">同姓同名あり（別人として登録）</span>
+                      )}
+                    </div>
                   )}
                 </td>
                 <td className="py-1.5 pr-2">
@@ -276,7 +318,8 @@ export default function MemberTable({ members, onChange, expeditionId, readOnly 
                   </td>
                 )}
               </tr>
-            ))}
+            );
+          })}
           </tbody>
         </table>
       </div>

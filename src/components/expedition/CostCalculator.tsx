@@ -38,8 +38,12 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
     initialData.memberAccommodationRecords || []
   );
 
-  // temp-ID が重複 INSERT されないよう保存済み temp-ID を追跡
-  const savedTempIds = useRef<Map<string, string>>(new Map()); // tempId -> realId
+  // 並行 saveAll を防ぐミューテックス
+  const isSavingRef = useRef(false);
+  // INSERT済みの temp メンバーID を追跡（同一セッション内で二重INSERTを防ぐ）
+  const savedTempIds = useRef<Set<string>>(new Set());
+  // 削除されたメンバーの実ID（次の saveAll でDB削除する）
+  const deletedMemberIds = useRef<string[]>([]);
 
   const expedition = initialData.expedition;
   const expeditionId = expedition.id;
@@ -53,7 +57,8 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
   useEffect(() => {
     if (prevExpeditionId.current !== expeditionId) {
       prevExpeditionId.current = expeditionId;
-      savedTempIds.current.clear();
+      savedTempIds.current = new Set();
+      deletedMemberIds.current = [];
       setMembers(initialData.members);
       setIncomeItems(initialData.incomeItems);
       setAccommodation(initialData.accommodation);
@@ -107,132 +112,164 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
   );
 
   const saveAll = useCallback(async () => {
-    // ── Step 1: メンバーを保存し、temp-ID → 実 UUID のマッピングを取得 ──
-    const idMap = new Map<string, string>(savedTempIds.current);
-    const mapId = (id: string) => idMap.get(id) ?? id;
+    // ── 並行実行防止 ──
+    if (isSavingRef.current) return;
+    isSavingRef.current = true;
 
-    for (const member of members) {
-      const realId = idMap.get(member.id);
-      if (realId) {
-        // すでに保存済み → UPDATE
-        await supabase.from('members')
-          .update({ ...member, id: realId, expedition_id: expeditionId })
-          .eq('id', realId);
-        continue;
+    try {
+      // ── Step 0: 削除されたメンバーをDBから削除 ──
+      const toDelete = [...deletedMemberIds.current];
+      deletedMemberIds.current = [];
+      for (const id of toDelete) {
+        await supabase.from('members').delete().eq('id', id);
       }
-      if (member.id.startsWith('temp-')) {
-        const { id: _ignore, ...insertData } = { ...member, expedition_id: expeditionId };
-        const { data } = await supabase.from('members').insert(insertData).select('id').single();
-        if (data?.id) {
-          idMap.set(member.id, data.id);
-          savedTempIds.current.set(member.id, data.id);
+
+      // ── Step 1: メンバーを保存（空白名はスキップ、二重INSERTを防ぐ）──
+      let hadNewMembers = false;
+      for (const member of members) {
+        if (!member.name.trim()) continue; // 空白名のメンバーは保存しない
+        if (member.id.startsWith('temp-')) {
+          if (savedTempIds.current.has(member.id)) continue; // 既にINSERT済み
+          const { id: _id, ...insertData } = { ...member, expedition_id: expeditionId };
+          const { data, error } = await supabase.from('members').insert(insertData).select('id').single();
+          if (!error && data?.id) {
+            savedTempIds.current.add(member.id);
+            hadNewMembers = true;
+          }
+        } else {
+          await supabase.from('members')
+            .update({ ...member, expedition_id: expeditionId })
+            .eq('id', member.id);
         }
-      } else {
-        await supabase.from('members')
-          .update({ ...member, expedition_id: expeditionId })
-          .eq('id', member.id);
       }
-    }
 
-    // ── Step 2: メンバーの実 ID をローカルステートに反映 ──
-    if (idMap.size > 0) {
-      setMembers(prev => prev.map(m => ({ ...m, id: mapId(m.id) })));
-      setMealRecords(prev => prev.map(r => ({ ...r, member_id: mapId(r.member_id) })));
-      setMemberAccommodation(prev => prev.map(r => ({ ...r, member_id: mapId(r.member_id) })));
-      setMemberTransport(prev => prev.map(r => ({ ...r, member_id: mapId(r.member_id) })));
-    }
+      // ── Step 2: 新規メンバーが追加された場合、DBから再取得してローカル状態をリセット ──
+      // これにより temp-ID が実 UUID に置き換わり、重複・空白行が消える
+      if (hadNewMembers) {
+        const { data: freshMembers } = await supabase
+          .from('members')
+          .select('*')
+          .eq('expedition_id', expeditionId)
+          .order('sort_order');
+        if (freshMembers) {
+          setMembers(freshMembers as Member[]);
+          savedTempIds.current = new Set(); // 全メンバーが実IDになったのでリセット
+        }
+        // meal records は useEffect で自動生成されるので明示的な更新不要
+        return; // 今回のサイクルはここで終了、次のauto-saveで残りを保存
+      }
 
-    // ── Step 3: 収入を保存 ──
-    for (const item of incomeItems) {
-      const amount = item.category === 'self_burden' ? selfPaymentTotal : item.amount;
-      const data = { ...item, amount, expedition_id: expeditionId };
-      if (item.id.startsWith('temp-')) {
-        const { id, ...insertData } = data;
-        await supabase.from('income_items').insert(insertData);
-      } else {
-        await supabase.from('income_items').update(data).eq('id', item.id);
+      // ── Step 3: 収入を保存 ──
+      let needsIncomeRefetch = false;
+      for (const item of incomeItems) {
+        const amount = item.category === 'self_burden' ? selfPaymentTotal : item.amount;
+        const data = { ...item, amount, expedition_id: expeditionId };
+        if (item.id.startsWith('temp-')) {
+          const { id, ...insertData } = data;
+          const { error } = await supabase.from('income_items').insert(insertData);
+          if (!error) needsIncomeRefetch = true;
+        } else {
+          await supabase.from('income_items').update(data).eq('id', item.id);
+        }
       }
-    }
+      if (needsIncomeRefetch) {
+        const { data: fresh } = await supabase.from('income_items').select('*').eq('expedition_id', expeditionId);
+        if (fresh) setIncomeItems(fresh as IncomeItem[]);
+        return;
+      }
 
-    // ── Step 4: 宿泊費を保存 ──
-    if (accommodation) {
-      const data = { ...accommodation, expedition_id: expeditionId };
-      if (accommodation.id.startsWith('temp-')) {
-        const { id, ...insertData } = data;
-        await supabase.from('accommodation_costs').insert(insertData);
-      } else {
-        await supabase.from('accommodation_costs').update(data).eq('id', accommodation.id);
+      // ── Step 4: 宿泊費を保存 ──
+      if (accommodation) {
+        const data = { ...accommodation, expedition_id: expeditionId };
+        if (accommodation.id.startsWith('temp-')) {
+          const { id, ...insertData } = data;
+          const { data: saved } = await supabase.from('accommodation_costs').insert(insertData).select('id').single();
+          if (saved?.id) {
+            setAccommodation(prev => prev ? { ...prev, id: saved.id } : prev);
+            return;
+          }
+        } else {
+          await supabase.from('accommodation_costs').update(data).eq('id', accommodation.id);
+        }
       }
-    }
 
-    // ── Step 5: 食事費（legacy/教員用）・交通費・その他 ──
-    for (const m of mealCosts) {
-      const data = { ...m, expedition_id: expeditionId };
-      if (m.id.startsWith('temp-')) {
-        const { id, ...insertData } = data;
-        await supabase.from('meal_costs').insert(insertData).select('id').single();
-      } else {
-        await supabase.from('meal_costs').update(data).eq('id', m.id);
+      // ── Step 5: 交通費・その他費用 ──
+      let needsTransportRefetch = false;
+      for (const t of transportCosts) {
+        const data = { ...t, expedition_id: expeditionId };
+        if (t.id.startsWith('temp-')) {
+          const { id, ...insertData } = data;
+          const { error } = await supabase.from('transport_costs').insert(insertData);
+          if (!error) needsTransportRefetch = true;
+        } else {
+          await supabase.from('transport_costs').update(data).eq('id', t.id);
+        }
       }
-    }
-    for (const t of transportCosts) {
-      const data = { ...t, expedition_id: expeditionId };
-      if (t.id.startsWith('temp-')) {
-        const { id, ...insertData } = data;
-        await supabase.from('transport_costs').insert(insertData);
-      } else {
-        await supabase.from('transport_costs').update(data).eq('id', t.id);
+      if (needsTransportRefetch) {
+        const { data: fresh } = await supabase.from('transport_costs').select('*').eq('expedition_id', expeditionId).order('sort_order');
+        if (fresh) setTransportCosts(fresh as TransportCost[]);
+        return;
       }
-    }
-    for (const o of otherCosts) {
-      const data = { ...o, expedition_id: expeditionId };
-      if (o.id.startsWith('temp-')) {
-        const { id, ...insertData } = data;
-        await supabase.from('other_costs').insert(insertData);
-      } else {
-        await supabase.from('other_costs').update(data).eq('id', o.id);
-      }
-    }
 
-    // ── Step 6: 食事レコード（実 member_id が確定してから保存）──
-    const mealRecordsToSave = mealRecords
-      .map(r => ({ ...r, member_id: mapId(r.member_id), expedition_id: expeditionId }))
-      .filter(r => !r.member_id.startsWith('temp-')); // 実 ID のみ保存
-
-    for (const record of mealRecordsToSave) {
-      if (record.id.startsWith('temp-')) {
-        const { id, ...insertData } = record;
-        await supabase.from('member_meal_records')
-          .upsert(insertData, { onConflict: 'member_id,date', ignoreDuplicates: false });
-      } else {
-        await supabase.from('member_meal_records').update(record).eq('id', record.id);
+      let needsOtherRefetch = false;
+      for (const o of otherCosts) {
+        const data = { ...o, expedition_id: expeditionId };
+        if (o.id.startsWith('temp-')) {
+          const { id, ...insertData } = data;
+          const { error } = await supabase.from('other_costs').insert(insertData);
+          if (!error) needsOtherRefetch = true;
+        } else {
+          await supabase.from('other_costs').update(data).eq('id', o.id);
+        }
       }
-    }
-
-    // ── Step 7: 教員交通・宿泊レコード ──
-    for (const r of memberTransport) {
-      const data = { ...r, member_id: mapId(r.member_id), expedition_id: expeditionId };
-      if (data.member_id.startsWith('temp-')) continue;
-      if (r.id.startsWith('temp-')) {
-        const { id, ...insertData } = data;
-        await supabase.from('member_transport_records').insert(insertData);
-      } else {
-        await supabase.from('member_transport_records').update(data).eq('id', r.id);
+      if (needsOtherRefetch) {
+        const { data: fresh } = await supabase.from('other_costs').select('*').eq('expedition_id', expeditionId).order('sort_order');
+        if (fresh) setOtherCosts(fresh as OtherCost[]);
+        return;
       }
-    }
-    for (const r of memberAccommodation) {
-      const data = { ...r, member_id: mapId(r.member_id), expedition_id: expeditionId };
-      if (data.member_id.startsWith('temp-')) continue;
-      if (r.id.startsWith('temp-')) {
-        const { id, ...insertData } = data;
-        await supabase.from('member_accommodation_records')
-          .upsert(insertData, { onConflict: 'member_id', ignoreDuplicates: false });
-      } else {
-        await supabase.from('member_accommodation_records').update(data).eq('id', r.id);
-      }
-    }
 
-    await supabase.from('expeditions').update({ updated_at: new Date().toISOString() }).eq('id', expeditionId);
+      // ── Step 6: 食事レコード（実 member_id のみ保存）──
+      const realMemberIds = new Set(members.filter(m => !m.id.startsWith('temp-')).map(m => m.id));
+      const mealRecordsToSave = mealRecords.filter(r => realMemberIds.has(r.member_id));
+
+      for (const record of mealRecordsToSave) {
+        const data = { ...record, expedition_id: expeditionId };
+        if (record.id.startsWith('temp-')) {
+          const { id, ...insertData } = data;
+          await supabase.from('member_meal_records')
+            .upsert(insertData, { onConflict: 'member_id,date', ignoreDuplicates: false });
+        } else {
+          await supabase.from('member_meal_records').update(data).eq('id', record.id);
+        }
+      }
+
+      // ── Step 7: 教員・個別交通・宿泊レコード ──
+      for (const r of memberTransport) {
+        if (r.member_id.startsWith('temp-')) continue;
+        const data = { ...r, expedition_id: expeditionId };
+        if (r.id.startsWith('temp-')) {
+          const { id, ...insertData } = data;
+          await supabase.from('member_transport_records').insert(insertData);
+        } else {
+          await supabase.from('member_transport_records').update(data).eq('id', r.id);
+        }
+      }
+      for (const r of memberAccommodation) {
+        if (r.member_id.startsWith('temp-')) continue;
+        const data = { ...r, expedition_id: expeditionId };
+        if (r.id.startsWith('temp-')) {
+          const { id, ...insertData } = data;
+          await supabase.from('member_accommodation_records')
+            .upsert(insertData, { onConflict: 'member_id', ignoreDuplicates: false });
+        } else {
+          await supabase.from('member_accommodation_records').update(data).eq('id', r.id);
+        }
+      }
+
+      await supabase.from('expeditions').update({ updated_at: new Date().toISOString() }).eq('id', expeditionId);
+    } finally {
+      isSavingRef.current = false;
+    }
   }, [
     members, incomeItems, accommodation, mealCosts, transportCosts, otherCosts,
     mealRecords, memberTransport, memberAccommodation, expeditionId, selfPaymentTotal,
@@ -273,6 +310,7 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
         <MemberTable
           members={members}
           onChange={setMembers}
+          onDelete={(id) => { deletedMemberIds.current.push(id); }}
           expeditionId={expeditionId}
         />
         <AccommodationSection
