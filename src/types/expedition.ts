@@ -56,8 +56,13 @@ export interface AccommodationCost {
   plan_type: string;
   unit_price: number;
   breakfast_price: number;
+  breakfast_subsidy: number;
   nights: number;
   subsidy_per_person: number;
+  lunch_price: number;
+  lunch_subsidy: number;
+  dinner_price: number;
+  dinner_subsidy: number;
   staff_unit_price?: number;
   staff_breakfast_price?: number;
   staff_subsidy_per_person?: number;
