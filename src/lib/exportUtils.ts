@@ -168,20 +168,17 @@ export async function exportToExcel(data: ExportData): Promise<void> {
     row.eachCell(c => styleDataCell(c, COLORS.student));
   }
 
-  // --- Sheet 3: 教員宿泊内訳 ---
-  const ws3 = wb.addWorksheet('教員宿泊内訳');
-  ws3.columns = [{ width: 14 }, { width: 12 }, { width: 12 }, { width: 10 }, { width: 8 }, { width: 8 }, { width: 12 }, { width: 12 }, { width: 12 }, { width: 14 }];
-  const staffAccH = ws3.addRow(['氏名', '区分', 'プラン', '1泊料金', '朝食', '泊数', '開始日', '終了日', '補助', '小計']);
+  // --- Sheet 3: 個人別宿泊内訳 ---
+  const ws3 = wb.addWorksheet('個人別宿泊内訳');
+  ws3.columns = [{ width: 14 }, { width: 12 }, { width: 14 }, { width: 10 }, { width: 14 }];
+  const staffAccH = ws3.addRow(['氏名', '区分', '宿泊日', '宿泊料', '備考']);
   styleHeader(staffAccH);
-  getIndividualMembers(members).forEach(m => {
-    const acc = memberAccommodation.find(r => r.member_id === m.id);
-    if (!acc) return;
-    const sub = (acc.unit_price + acc.breakfast_price) * acc.nights - acc.subsidy_amount;
-    const row = ws3.addRow([
-      m.name, MEMBER_ROLE_LABELS[m.role], acc.plan_type, acc.unit_price, acc.breakfast_price,
-      acc.nights, acc.start_date || '', acc.end_date || '', acc.subsidy_amount, sub,
-    ]);
-    row.eachCell(c => styleDataCell(c, COLORS.staff));
+  members.forEach(m => {
+    const memberAccRecs = memberAccommodation.filter(r => r.member_id === m.id && r.stays !== false);
+    memberAccRecs.forEach(acc => {
+      const row = ws3.addRow([m.name, MEMBER_ROLE_LABELS[m.role], acc.date, acc.unit_price, acc.notes || '']);
+      row.eachCell(c => styleDataCell(c, COLORS.student));
+    });
   });
 
   // --- Sheet 4: 食事マトリクス ---

@@ -7,7 +7,7 @@ import { useAutoSave } from '@/hooks/useAutoSave';
 import { getDateRange } from '@/lib/calculations';
 import IncomeSection, { getEffectiveIncomeItems } from './IncomeSection';
 import MemberTable from './MemberTable';
-import AccommodationSection from './AccommodationSection';
+import IndividualMatrix from './IndividualMatrix';
 import ExpenseMatrix from './ExpenseMatrix';
 import TransportSection from './TransportSection';
 import ExpenseSection from './ExpenseSection';
@@ -71,6 +71,9 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
     }
   }, [initialData, expeditionId]);
 
+  // 遠征期間の「夜」日付（最終日以外）
+  const nightDates = useMemo(() => dates.slice(0, -1), [dates]);
+
   // 名簿変更時に食事レコードを自動生成（重複を防ぐ）
   useEffect(() => {
     if (members.length === 0 || dates.length === 0) return;
@@ -89,6 +92,9 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
               breakfast_status: 'eat',
               lunch_status: 'eat',
               dinner_status: 'eat',
+              breakfast_price: 0,
+              lunch_price: 0,
+              dinner_price: 0,
             });
             changed = true;
           }
@@ -101,6 +107,36 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
       return changed ? filtered : prev;
     });
   }, [members, dates, expeditionId]);
+
+  // 名簿変更時に宿泊レコードを自動生成（夜の日数 × メンバー数）
+  useEffect(() => {
+    if (members.length === 0 || nightDates.length === 0) return;
+    setMemberAccommodation(prev => {
+      let changed = false;
+      const merged = [...prev];
+      for (const member of members) {
+        for (const date of nightDates) {
+          const exists = merged.some(r => r.member_id === member.id && r.date === date);
+          if (!exists) {
+            merged.push({
+              id: `temp-acc-${member.id}-${date}`,
+              expedition_id: expeditionId,
+              member_id: member.id,
+              date,
+              stays: false,
+              unit_price: 0,
+            });
+            changed = true;
+          }
+        }
+      }
+      // 削除されたメンバーのレコードを除去
+      const memberIds = new Set(members.map(m => m.id));
+      const filtered = merged.filter(r => memberIds.has(r.member_id));
+      if (filtered.length !== merged.length) changed = true;
+      return changed ? filtered : prev;
+    });
+  }, [members, nightDates, expeditionId]);
 
   const selfPaymentTotal = members.reduce((sum, m) => sum + m.self_payment, 0);
   const effectiveIncome = getEffectiveIncomeItems(incomeItems, selfPaymentTotal);
@@ -178,20 +214,8 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
         return;
       }
 
-      // ── Step 4: 宿泊費を保存 ──
-      if (accommodation) {
-        const data = { ...accommodation, expedition_id: expeditionId };
-        if (accommodation.id.startsWith('temp-')) {
-          const { id, ...insertData } = data;
-          const { data: saved } = await supabase.from('accommodation_costs').insert(insertData).select('id').single();
-          if (saved?.id) {
-            setAccommodation(prev => prev ? { ...prev, id: saved.id } : prev);
-            return;
-          }
-        } else {
-          await supabase.from('accommodation_costs').update(data).eq('id', accommodation.id);
-        }
-      }
+      // ── Step 4: 宿泊費（共通設定は廃止。個別レコードは Step 7 で保存）──
+      // accommodation_costs テーブルは現在未使用
 
       // ── Step 5: 交通費・その他費用 ──
       let needsTransportRefetch = false;
@@ -260,7 +284,7 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
         if (r.id.startsWith('temp-')) {
           const { id, ...insertData } = data;
           await supabase.from('member_accommodation_records')
-            .upsert(insertData, { onConflict: 'member_id', ignoreDuplicates: false });
+            .upsert(insertData, { onConflict: 'member_id,date', ignoreDuplicates: false });
         } else {
           await supabase.from('member_accommodation_records').update(data).eq('id', r.id);
         }
@@ -271,12 +295,12 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
       isSavingRef.current = false;
     }
   }, [
-    members, incomeItems, accommodation, mealCosts, transportCosts, otherCosts,
+    members, incomeItems, mealCosts, transportCosts, otherCosts,
     mealRecords, memberTransport, memberAccommodation, expeditionId, selfPaymentTotal,
   ]);
 
   useAutoSave(saveAll, [
-    members, incomeItems, accommodation, mealCosts, transportCosts, otherCosts,
+    members, incomeItems, mealCosts, transportCosts, otherCosts,
     mealRecords, memberTransport, memberAccommodation,
   ]);
 
@@ -313,13 +337,13 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
           onDelete={(id) => { deletedMemberIds.current.push(id); }}
           expeditionId={expeditionId}
         />
-        <AccommodationSection
-          accommodation={accommodation}
-          onChange={setAccommodation}
+        <IndividualMatrix
           members={members}
-          expeditionId={expeditionId}
           mealRecords={mealRecords}
           onChangeMealRecords={setMealRecords}
+          accommodationRecords={memberAccommodation}
+          onChangeAccommodationRecords={setMemberAccommodation}
+          expeditionId={expeditionId}
           startDate={expedition.start_date}
           endDate={expedition.end_date}
         />
@@ -336,7 +360,7 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
           expeditionId={expeditionId}
           startDate={expedition.start_date}
           endDate={expedition.end_date}
-          groupAccommodation={accommodation}
+          groupAccommodation={null}
         />
         <TransportSection
           transportCosts={transportCosts}
@@ -355,7 +379,7 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
           expedition={expedition}
           members={members}
           incomeItems={incomeItems}
-          accommodation={accommodation}
+          accommodation={null}
           mealCosts={mealCosts}
           transportCosts={transportCosts}
           otherCosts={otherCosts}

@@ -119,6 +119,9 @@ export interface MemberMealRecord {
   breakfast_status: MealStatus;
   lunch_status: MealStatus;
   dinner_status: MealStatus;
+  breakfast_price: number;
+  lunch_price: number;
+  dinner_price: number;
 }
 
 export interface MemberTransportRecord {
@@ -137,13 +140,9 @@ export interface MemberAccommodationRecord {
   id: string;
   expedition_id: string;
   member_id: string;
-  plan_type: string;
-  unit_price: number;
-  breakfast_price: number;
-  nights: number;
-  start_date?: string;
-  end_date?: string;
-  subsidy_amount: number;
+  date: string;        // チェックイン日（宿泊する夜の日付）
+  stays: boolean;      // その夜に宿泊するか
+  unit_price: number;  // その夜の宿泊料
   notes?: string;
 }
 
@@ -163,6 +162,18 @@ export interface ExpenseSplit {
   total: number;
 }
 
+/** 役職グループ別集計 */
+export interface RoleGroupSummary {
+  role: MemberRole;
+  label: string;
+  memberCount: number;
+  accommodationTotal: number;
+  mealTotal: number;
+  transportTotal: number;
+  total: number;
+  isSubsidized: boolean; // 学校補助対象か
+}
+
 export interface ExpeditionSummary {
   totalIncome: number;
   totalExpense: number;
@@ -175,6 +186,9 @@ export interface ExpeditionSummary {
   accommodationSplit: ExpenseSplit;
   mealSplit: ExpenseSplit;
   transportSplit: ExpenseSplit;
+  roleGroupSummaries: RoleGroupSummary[];
+  subsidizedTotal: number;    // 補助対象合計（顧問・選手・セコンド・引率）
+  nonSubsidizedTotal: number; // 補助対象外合計（外部指導・応援）
   incomeByCategory: Record<IncomeCategory, number>;
   memberCount: {
     athletes: number;

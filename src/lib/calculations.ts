@@ -2,95 +2,90 @@ import type {
   Member, IncomeItem, AccommodationCost, MealCost,
   TransportCost, OtherCost, ExpeditionSummary, IncomeCategory, ExpenseSplit,
   MemberMealRecord, MemberTransportRecord, MemberAccommodationRecord,
-  PersonExpenseDetail, MealType, MealStatus
+  PersonExpenseDetail, MealType, MealStatus, MemberRole, RoleGroupSummary,
 } from '@/types/expedition';
+import { MEMBER_ROLE_LABELS, GROUP_TRANSPORT_TYPES } from '@/types/expedition';
 import {
-  getLodgingStudentCount, getMealStatus,
-  isStudentRole, needsIndividualTracking, getStudentMembers, getIndividualMembers,
+  isStudentRole, needsIndividualTracking,
   INDIVIDUAL_EXPENSE_ROLES
 } from '@/lib/memberRoles';
-import { GROUP_TRANSPORT_TYPES } from '@/types/expedition';
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner'];
 
-/** accommodation の新フィールドから食事単価を返す */
-function accMealPrice(acc: AccommodationCost, mealType: MealType): number {
-  if (mealType === 'breakfast') return acc.breakfast_price ?? 0;
-  if (mealType === 'lunch') return acc.lunch_price ?? 0;
-  return acc.dinner_price ?? 0;
-}
+/** 補助対象外の役職 */
+const NON_SUBSIDIZED_ROLES: MemberRole[] = ['external_coach', 'supporter'];
 
-/** accommodation の新フィールドから食事補助を返す */
-function accMealSubsidy(acc: AccommodationCost, mealType: MealType): number {
-  if (mealType === 'breakfast') return acc.breakfast_subsidy ?? 0;
-  if (mealType === 'lunch') return acc.lunch_subsidy ?? 0;
-  return acc.dinner_subsidy ?? 0;
-}
+/** 役職の表示順 */
+const ROLE_ORDER: MemberRole[] = ['advisor', 'external_coach', 'staff', 'athlete', 'second', 'supporter'];
 
-function calcStudentGroupAccommodation(
-  accommodation: AccommodationCost,
-  members: Member[]
+// ── 個人別宿泊費計算 ────────────────────────────────────────────
+function calcMemberAccommodationTotal(
+  records: MemberAccommodationRecord[],
+  memberId: string
 ): number {
-  const studentCount = getLodgingStudentCount(members);
-  // 宿泊費（食事は別計上）
-  const gross = accommodation.unit_price * studentCount * accommodation.nights;
-  const subsidy = accommodation.subsidy_per_person * studentCount * accommodation.nights;
-  return gross - subsidy;
+  return records
+    .filter(r => r.member_id === memberId && r.stays !== false)
+    .reduce((sum, r) => sum + (r.unit_price || 0), 0);
 }
 
-function calcStaffAccommodationRecords(records: MemberAccommodationRecord[]): number {
-  return records.reduce((sum, r) => {
-    const gross = (r.unit_price + r.breakfast_price) * r.nights;
-    return sum + gross - r.subsidy_amount;
-  }, 0);
+// ── 個人別食事費計算 ─────────────────────────────────────────────
+function calcMemberMealTotal(
+  records: MemberMealRecord[],
+  memberId: string
+): number {
+  return records
+    .filter(r => r.member_id === memberId)
+    .reduce((sum, r) => {
+      let t = 0;
+      if (r.breakfast_status === 'eat') t += r.breakfast_price || 0;
+      if (r.lunch_status === 'eat') t += r.lunch_price || 0;
+      if (r.dinner_status === 'eat') t += r.dinner_price || 0;
+      return sum + t;
+    }, 0);
 }
 
-/**
- * 食事マトリクスから合計を計算する（accommodation の meal price フィールドを使用）
- * 全メンバーの食事を統一単価で計算し、生徒・教員を分ける
- */
-function calcMealsFromAccommodation(
+// ── 役職グループ別集計 ────────────────────────────────────────────
+function calcRoleGroupSummaries(
   members: Member[],
+  accommodationRecords: MemberAccommodationRecord[],
   mealRecords: MemberMealRecord[],
-  accommodation: AccommodationCost,
-  dates: string[]
-): ExpenseSplit {
-  let student = 0;
-  let staff = 0;
+  transportRecords: MemberTransportRecord[]
+): RoleGroupSummary[] {
+  return ROLE_ORDER
+    .filter(role => members.some(m => m.role === role))
+    .map(role => {
+      const roleMembers = members.filter(m => m.role === role);
+      const roleMemberIds = new Set(roleMembers.map(m => m.id));
 
-  for (const date of dates) {
-    for (const mealType of MEAL_TYPES) {
-      const price = accMealPrice(accommodation, mealType);
-      const subsidy = accMealSubsidy(accommodation, mealType);
-      const net = price - subsidy;
-      if (net <= 0 && price <= 0) continue;
+      const accommodationTotal = accommodationRecords
+        .filter(r => roleMemberIds.has(r.member_id) && r.stays !== false)
+        .reduce((sum, r) => sum + (r.unit_price || 0), 0);
 
-      for (const m of getStudentMembers(members)) {
-        if (getMealStatus(mealRecords, m.id, date, mealType) === 'eat') {
-          student += Math.max(0, net);
-        }
-      }
-      for (const m of getIndividualMembers(members)) {
-        if (getMealStatus(mealRecords, m.id, date, mealType) === 'eat') {
-          staff += price; // 教員は補助なしの単価（補助は生徒会費ベース）
-        }
-      }
-    }
-  }
-  return { student, staff, total: student + staff };
-}
+      const mealTotal = mealRecords
+        .filter(r => roleMemberIds.has(r.member_id))
+        .reduce((sum, r) => {
+          let t = 0;
+          if (r.breakfast_status === 'eat') t += r.breakfast_price || 0;
+          if (r.lunch_status === 'eat') t += r.lunch_price || 0;
+          if (r.dinner_status === 'eat') t += r.dinner_price || 0;
+          return sum + t;
+        }, 0);
 
-function calcLegacyMeals(mealCosts: MealCost[]): ExpenseSplit {
-  const student = mealCosts.reduce((sum, m) => {
-    const sc = m.student_count ?? m.target_count ?? 0;
-    return sum + sc * (m.unit_price ?? 0);
-  }, 0);
-  const staff = mealCosts.reduce((sum, m) => {
-    const st = m.staff_count ?? m.non_target_count ?? 0;
-    const price = m.staff_unit_price ?? m.unit_price ?? 0;
-    return sum + st * price;
-  }, 0);
-  return { student, staff, total: student + staff };
+      const transportTotal = transportRecords
+        .filter(r => roleMemberIds.has(r.member_id))
+        .reduce((sum, r) => sum + (r.amount || 0), 0);
+
+      return {
+        role,
+        label: MEMBER_ROLE_LABELS[role],
+        memberCount: roleMembers.length,
+        accommodationTotal,
+        mealTotal,
+        transportTotal,
+        total: accommodationTotal + mealTotal + transportTotal,
+        isSubsidized: !NON_SUBSIDIZED_ROLES.includes(role),
+      };
+    });
 }
 
 function calcGroupTransport(transportCosts: TransportCost[]): number {
@@ -119,21 +114,9 @@ export function calcPersonExpenseDetails(
   dates: string[],
   groupAccommodation?: AccommodationCost | null
 ): PersonExpenseDetail[] {
-  return getIndividualMembers(members).map(m => {
-    let mealTotal = 0;
-    for (const date of dates) {
-      for (const mealType of MEAL_TYPES) {
-        if (getMealStatus(mealRecords, m.id, date, mealType) === 'eat') {
-          if (groupAccommodation) {
-            mealTotal += accMealPrice(groupAccommodation, mealType);
-          }
-        }
-      }
-    }
-    const acc = accommodationRecords.find(r => r.member_id === m.id);
-    const accommodationTotal = acc
-      ? (acc.unit_price + acc.breakfast_price) * acc.nights - acc.subsidy_amount
-      : 0;
+  return members.map(m => {
+    const mealTotal = calcMemberMealTotal(mealRecords, m.id);
+    const accommodationTotal = calcMemberAccommodationTotal(accommodationRecords, m.id);
     const transportTotal = transportRecords
       .filter(r => r.member_id === m.id)
       .reduce((s, r) => s + r.amount, 0);
@@ -153,8 +136,8 @@ export function calcPersonExpenseDetails(
 export function calculateSummary(
   members: Member[],
   incomeItems: IncomeItem[],
-  accommodation: AccommodationCost | null,
-  mealCosts: MealCost[],
+  accommodation: AccommodationCost | null, // レガシー互換（現在は未使用）
+  mealCosts: MealCost[],                   // レガシー互換（現在は未使用）
   transportCosts: TransportCost[],
   otherCosts: OtherCost[],
   memberMealRecords: MemberMealRecord[] = [],
@@ -168,64 +151,55 @@ export function calculateSummary(
     return acc;
   }, {} as Record<string, number>);
 
-  // 宿泊費（食事別計上）
-  const studentAcc = accommodation ? calcStudentGroupAccommodation(accommodation, members) : 0;
-  const staffAcc = calcStaffAccommodationRecords(memberAccommodationRecords);
-  const accommodationSplit: ExpenseSplit = {
-    student: studentAcc,
-    staff: staffAcc,
-    total: studentAcc + staffAcc,
-  };
+  // ── 個人別レコードから宿泊・食事合計を計算 ──────────────────────
+  const accommodationTotal = memberAccommodationRecords
+    .filter(r => r.stays !== false)
+    .reduce((sum, r) => sum + (r.unit_price || 0), 0);
 
-  // 食事費：accommodation の新フィールドがあれば使う、なければ legacy
-  const useNewMealCalc = accommodation && (
-    (accommodation.lunch_price ?? 0) > 0 ||
-    (accommodation.dinner_price ?? 0) > 0 ||
-    (accommodation.breakfast_price ?? 0) > 0
-  );
-  const mealSplit = (useNewMealCalc && memberMealRecords.length > 0 && dates.length > 0)
-    ? calcMealsFromAccommodation(members, memberMealRecords, accommodation!, dates)
-    : memberMealRecords.length > 0 && dates.length > 0
-      ? (() => {
-        // fallback: no accommodation prices, use meal_costs
-        let student = 0, staff = 0;
-        for (const date of dates) {
-          for (const mealType of MEAL_TYPES) {
-            for (const m of getStudentMembers(members)) {
-              if (getMealStatus(memberMealRecords, m.id, date, mealType) === 'eat') student += 0;
-            }
-          }
-        }
-        return { student, staff, total: student + staff };
-      })()
-      : calcLegacyMeals(mealCosts);
+  const mealTotal = memberMealRecords.reduce((sum, r) => {
+    let t = 0;
+    if (r.breakfast_status === 'eat') t += r.breakfast_price || 0;
+    if (r.lunch_status === 'eat') t += r.lunch_price || 0;
+    if (r.dinner_status === 'eat') t += r.dinner_price || 0;
+    return sum + t;
+  }, 0);
 
   const groupTransport = calcGroupTransport(transportCosts);
   const individualTransport = calcIndividualTransport(memberTransportRecords);
-  const transportSplit: ExpenseSplit = {
-    student: groupTransport,
-    staff: individualTransport,
-    total: groupTransport + individualTransport,
-  };
+  const transportTotal = groupTransport + individualTransport;
 
   const otherTotal = otherCosts.reduce((sum, o) => sum + o.amount, 0);
-  const memberSelfPaymentTotal = members.reduce((sum, m) => sum + m.self_payment, 0);
-  const totalExpense =
-    accommodationSplit.total + mealSplit.total + transportSplit.total + otherTotal;
+  const totalExpense = accommodationTotal + mealTotal + transportTotal + otherTotal;
   const balance = totalIncome - totalExpense;
+
+  const memberSelfPaymentTotal = members.reduce((sum, m) => sum + m.self_payment, 0);
+
+  // ── 役職グループ別集計 ────────────────────────────────────────────
+  const roleGroupSummaries = calcRoleGroupSummaries(
+    members, memberAccommodationRecords, memberMealRecords, memberTransportRecords
+  );
+  const subsidizedTotal = roleGroupSummaries
+    .filter(g => g.isSubsidized)
+    .reduce((sum, g) => sum + g.total, 0);
+  const nonSubsidizedTotal = roleGroupSummaries
+    .filter(g => !g.isSubsidized)
+    .reduce((sum, g) => sum + g.total, 0);
 
   return {
     totalIncome,
     totalExpense,
     balance,
-    accommodationTotal: accommodationSplit.total,
-    mealTotal: mealSplit.total,
-    transportTotal: transportSplit.total,
+    accommodationTotal,
+    mealTotal,
+    transportTotal,
     otherTotal,
     memberSelfPaymentTotal,
-    accommodationSplit,
-    mealSplit,
-    transportSplit,
+    accommodationSplit: { student: accommodationTotal, staff: 0, total: accommodationTotal },
+    mealSplit: { student: mealTotal, staff: 0, total: mealTotal },
+    transportSplit: { student: groupTransport, staff: individualTransport, total: transportTotal },
+    roleGroupSummaries,
+    subsidizedTotal,
+    nonSubsidizedTotal,
     incomeByCategory: incomeByCategory as Record<IncomeCategory, number>,
     memberCount: {
       athletes: members.filter(m => m.role === 'athlete').length,

@@ -126,6 +126,9 @@ export default function AccommodationSection({
         breakfast_status: 'eat' as MealStatus,
         lunch_status: 'eat' as MealStatus,
         dinner_status: 'eat' as MealStatus,
+        breakfast_price: 0,
+        lunch_price: 0,
+        dinner_price: 0,
         [statusKey]: cycleMealStatus('eat'),
       }]);
     }

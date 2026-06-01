@@ -82,6 +82,9 @@ export function buildDefaultMealRecords(
         breakfast_status: 'eat',
         lunch_status: 'eat',
         dinner_status: 'eat',
+        breakfast_price: 0,
+        lunch_price: 0,
+        dinner_price: 0,
       });
     }
   }

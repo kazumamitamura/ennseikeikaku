@@ -75,37 +75,19 @@ export default function SummaryPanel({
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h4 className="font-semibold text-gray-700 mb-3">📋 内訳</h4>
-        <div className="space-y-3 text-sm">
-          <div>
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-600">宿泊費</span>
-              <span className="font-mono">{formatCurrency(summary.accommodationTotal)}</span>
-            </div>
-            <div className="flex justify-between text-xs text-gray-500 pl-2">
-              <span>生徒 / 教員</span>
-              <span>{formatCurrency(summary.accommodationSplit.student)} / {formatCurrency(summary.accommodationSplit.staff)}</span>
-            </div>
+        <h4 className="font-semibold text-gray-700 mb-3">📋 費目別内訳</h4>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-600">宿泊費</span>
+            <span className="font-mono">{formatCurrency(summary.accommodationTotal)}</span>
           </div>
-          <div>
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-600">食事費</span>
-              <span className="font-mono">{formatCurrency(summary.mealTotal)}</span>
-            </div>
-            <div className="flex justify-between text-xs text-gray-500 pl-2">
-              <span>生徒 / 教員</span>
-              <span>{formatCurrency(summary.mealSplit.student)} / {formatCurrency(summary.mealSplit.staff)}</span>
-            </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">食事費</span>
+            <span className="font-mono">{formatCurrency(summary.mealTotal)}</span>
           </div>
-          <div>
-            <div className="flex justify-between mb-1">
-              <span className="text-gray-600">交通費</span>
-              <span className="font-mono">{formatCurrency(summary.transportTotal)}</span>
-            </div>
-            <div className="flex justify-between text-xs text-gray-500 pl-2">
-              <span>生徒 / 教員</span>
-              <span>{formatCurrency(summary.transportSplit.student)} / {formatCurrency(summary.transportSplit.staff)}</span>
-            </div>
+          <div className="flex justify-between">
+            <span className="text-gray-600">交通費</span>
+            <span className="font-mono">{formatCurrency(summary.transportTotal)}</span>
           </div>
           <div className="flex justify-between pt-1 border-t">
             <span className="text-gray-600">その他</span>
@@ -113,6 +95,47 @@ export default function SummaryPanel({
           </div>
         </div>
       </div>
+
+      {/* 役職別集計 */}
+      {summary.roleGroupSummaries && summary.roleGroupSummaries.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <h4 className="font-semibold text-gray-700 mb-3 text-sm">👥 役職別集計</h4>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b text-gray-500">
+                <th className="pb-1 text-left">役職</th>
+                <th className="pb-1 text-right">宿泊</th>
+                <th className="pb-1 text-right">食事</th>
+                <th className="pb-1 text-right">計</th>
+              </tr>
+            </thead>
+            <tbody>
+              {summary.roleGroupSummaries.map(g => (
+                <tr key={g.role} className={`border-b border-gray-50 ${!g.isSubsidized ? 'text-orange-700' : ''}`}>
+                  <td className="py-0.5">
+                    {g.label}
+                    <span className="text-gray-400 ml-1">({g.memberCount}名)</span>
+                    {!g.isSubsidized && <span className="ml-1 text-xs text-red-500">対象外</span>}
+                  </td>
+                  <td className="py-0.5 text-right font-mono">{g.accommodationTotal > 0 ? formatCurrency(g.accommodationTotal) : '—'}</td>
+                  <td className="py-0.5 text-right font-mono">{g.mealTotal > 0 ? formatCurrency(g.mealTotal) : '—'}</td>
+                  <td className="py-0.5 text-right font-mono font-medium">{g.total > 0 ? formatCurrency(g.total) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="text-xs font-semibold">
+              <tr className="border-t border-gray-200 text-green-700">
+                <td colSpan={3} className="pt-1">補助対象計</td>
+                <td className="pt-1 text-right font-mono">{formatCurrency(summary.subsidizedTotal)}</td>
+              </tr>
+              <tr className="text-orange-600">
+                <td colSpan={3}>補助対象外計</td>
+                <td className="text-right font-mono">{formatCurrency(summary.nonSubsidizedTotal)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
 
       <ReportExport
         expedition={expedition}
