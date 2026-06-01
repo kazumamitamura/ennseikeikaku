@@ -344,3 +344,70 @@ export const SUBSIDY_ITEM_TYPE_LABELS: Record<SubsidyItemType, string> = {
   lunch: '🥗 昼食',
   dinner: '🍱 夕食',
 };
+
+// エイリアス（v3命令書との互換）
+export const SUBSIDY_ITEM_LABELS = SUBSIDY_ITEM_TYPE_LABELS;
+
+export const ITEM_TYPE_ORDER: SubsidyItemType[] = [
+  'accommodation', 'breakfast', 'lunch', 'dinner',
+];
+
+// 役職ごとの補助対象デフォルト（既存 MemberRole に準拠）
+export const ROLE_SUBSIDY_DEFAULT: Record<MemberRole, boolean> = {
+  athlete:        true,   // 選手 → 補助対象
+  second:         true,   // セコンド → 補助対象
+  advisor:        true,   // 顧問 → 補助対象
+  external_coach: false,  // 外部指導者 → デフォルト対象外
+  supporter:      false,  // 応援 → 対象外
+  staff:          false,  // 引率 → 対象外
+};
+
+// ============================================================
+// 補助対象費（個人紐付け）v3
+// ============================================================
+
+export interface SubsidyPersonItem {
+  id: string;
+  expedition_id: string;
+  member_id: string;
+  item_type: SubsidyItemType;
+  date: string;
+  actual_amount: number;
+  subsidy_amount: number;
+  is_subsidy_target: boolean;
+  is_skipped: boolean;
+  skip_reason?: string;
+  auto_excluded: boolean;
+  auto_exclude_reason?: string;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SubsidyPersonItemCalc extends SubsidyPersonItem {
+  net_amount: number;
+  effective_subsidy: number;
+  effective_expense: number;
+}
+
+export interface SubsidyPersonItemWithMember extends SubsidyPersonItemCalc {
+  member_name: string;
+  member_role: MemberRole;
+}
+
+export interface BulkInputForm {
+  item_type: SubsidyItemType;
+  date: string;
+  actual_amount: number;
+  subsidy_amount: number;
+  is_subsidy_target: boolean;
+  target_member_ids: string[];
+}
+
+export interface SubsidyGroupSummary {
+  total_actual: number;
+  total_subsidy: number;
+  total_net: number;
+  person_count: number;
+  skipped_count: number;
+}
