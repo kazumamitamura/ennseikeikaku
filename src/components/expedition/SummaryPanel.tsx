@@ -9,8 +9,9 @@ import type {
   Expedition, Member, IncomeItem, AccommodationCost,
   MealCost, TransportCost, OtherCost
 } from '@/types/expedition';
+import { formatYen } from '@/lib/subsidyCalculations';
 import type {
-  MemberMealRecord, MemberTransportRecord, MemberAccommodationRecord,
+  MemberMealRecord, MemberTransportRecord, MemberAccommodationRecord, SubsidySummary,
 } from '@/types/expedition';
 
 interface SummaryPanelProps {
@@ -25,6 +26,7 @@ interface SummaryPanelProps {
   mealRecords?: MemberMealRecord[];
   memberTransport?: MemberTransportRecord[];
   memberAccommodation?: MemberAccommodationRecord[];
+  subsidySummary?: SubsidySummary | null;
 }
 
 export default function SummaryPanel({
@@ -39,6 +41,7 @@ export default function SummaryPanel({
   mealRecords,
   memberTransport,
   memberAccommodation,
+  subsidySummary,
 }: SummaryPanelProps) {
   const isPositive = summary.balance >= 0;
 
@@ -134,6 +137,46 @@ export default function SummaryPanel({
               </tr>
             </tfoot>
           </table>
+        </div>
+      )}
+
+      {/* 補助対象費サマリー */}
+      {subsidySummary && subsidySummary.total_actual_expense > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          <h4 className="font-semibold text-gray-700 mb-3 text-sm">🏨 補助対象費内訳</h4>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b text-gray-500">
+                <th className="pb-1 text-left"></th>
+                <th className="pb-1 text-right text-blue-700">実支出</th>
+                <th className="pb-1 text-right text-green-700">補助額</th>
+                <th className="pb-1 text-right text-amber-700">差額</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-gray-50">
+                <td className="py-1">🏨 宿泊費</td>
+                <td className="py-1 text-right font-mono text-blue-700">{formatYen(subsidySummary.accommodation_actual)}</td>
+                <td className="py-1 text-right font-mono text-green-700">{formatYen(subsidySummary.accommodation_subsidy)}</td>
+                <td className="py-1 text-right font-mono text-amber-700">{formatYen(subsidySummary.accommodation_net)}</td>
+              </tr>
+              <tr className="border-b border-gray-50">
+                <td className="py-1">🍱 食事費</td>
+                <td className="py-1 text-right font-mono text-blue-700">{formatYen(subsidySummary.meal_actual)}</td>
+                <td className="py-1 text-right font-mono text-green-700">{formatYen(subsidySummary.meal_subsidy)}</td>
+                <td className="py-1 text-right font-mono text-amber-700">{formatYen(subsidySummary.meal_net)}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-gray-200 font-semibold text-xs">
+                <td className="pt-1">合計</td>
+                <td className="pt-1 text-right font-mono text-blue-700">{formatYen(subsidySummary.total_actual_expense)}</td>
+                <td className="pt-1 text-right font-mono text-green-700">{formatYen(subsidySummary.total_subsidy_income)}</td>
+                <td className="pt-1 text-right font-mono text-amber-700">{formatYen(subsidySummary.total_net_expense)}</td>
+              </tr>
+            </tfoot>
+          </table>
+          <p className="text-xs text-green-700 mt-2">↑ 補助額 {formatYen(subsidySummary.total_subsidy_income)} は収入として自動計上</p>
         </div>
       )}
 

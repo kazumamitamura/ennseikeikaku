@@ -8,7 +8,7 @@ export type TransportType =
   | 'rental_car' | 'travel_agency' | 'fuel' | 'shinkansen'
   | 'train' | 'taxi' | 'charter' | 'highway' | 'parking' | 'other';
 export type IncomeCategory =
-  | 'club' | 'student_council' | 'subsidy' | 'self_burden' | 'other';
+  | 'club' | 'student_council' | 'subsidy' | 'self_burden' | 'other' | 'subsidy_auto';
 
 export interface Expedition {
   id: string;
@@ -23,6 +23,9 @@ export interface Expedition {
   vehicle_type: VehicleType;
   notes?: string;
   status: ExpeditionStatus;
+  move_in_date?: string;   // 移動初日（前日移動の場合）
+  move_out_date?: string;  // 移動最終日
+  subsidy_target_roles?: string[];
   created_at: string;
   updated_at: string;
 }
@@ -254,6 +257,7 @@ export const INCOME_CATEGORY_LABELS: Record<IncomeCategory, string> = {
   subsidy: '学校補助金',
   self_burden: '自己負担徴収合計',
   other: 'その他収入',
+  subsidy_auto: '補助金（宿泊・食事）自動計上',
 };
 
 export const TRANSPORT_TYPE_LABELS: Record<TransportType, string> = {
@@ -273,4 +277,70 @@ export const MEAL_TYPE_LABELS: Record<MealType, string> = {
   breakfast: '朝',
   lunch: '昼',
   dinner: '夕',
+};
+
+// ============================================================
+// 補助対象費（Step 2）
+// ============================================================
+
+export type SubsidyItemType =
+  | 'accommodation'
+  | 'breakfast'
+  | 'lunch'
+  | 'dinner';
+
+export interface SubsidyItem {
+  id: string;
+  expedition_id: string;
+  date: string;
+  item_type: SubsidyItemType;
+  is_subsidy_target: boolean;
+  subsidy_rule_reason?: string;
+  subsidy_target_count: number;
+  non_subsidy_count: number;
+  skip_count: number;
+  subsidy_amount_per_person: number;
+  actual_amount_per_person: number;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface SubsidyItemCalculated extends SubsidyItem {
+  total_subsidy_amount: number;
+  total_actual_subsidy: number;
+  net_burden_subsidy: number;
+  total_actual_non_subsidy: number;
+  grand_total_actual: number;
+  grand_total_subsidy: number;
+  grand_net_expense: number;
+}
+
+export interface SubsidyDaySummary {
+  date: string;
+  items: SubsidyItemCalculated[];
+  day_total_actual: number;
+  day_total_subsidy: number;
+  day_net_expense: number;
+  is_first_travel_day: boolean;
+  is_last_travel_day: boolean;
+}
+
+export interface SubsidySummary {
+  accommodation_actual: number;
+  accommodation_subsidy: number;
+  accommodation_net: number;
+  meal_actual: number;
+  meal_subsidy: number;
+  meal_net: number;
+  total_subsidy_income: number;
+  total_actual_expense: number;
+  total_net_expense: number;
+}
+
+export const SUBSIDY_ITEM_TYPE_LABELS: Record<SubsidyItemType, string> = {
+  accommodation: '🏨 宿泊',
+  breakfast: '🍳 朝食',
+  lunch: '🥗 昼食',
+  dinner: '🍱 夕食',
 };

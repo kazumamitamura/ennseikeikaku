@@ -12,10 +12,12 @@ import ExpenseMatrix from './ExpenseMatrix';
 import TransportSection from './TransportSection';
 import ExpenseSection from './ExpenseSection';
 import SummaryPanel from './SummaryPanel';
+import SubsidySection from './SubsidySection';
 import type {
   Expedition, Member, IncomeItem, AccommodationCost,
   MealCost, TransportCost, OtherCost, ExpeditionFullData,
   MemberMealRecord, MemberTransportRecord, MemberAccommodationRecord,
+  SubsidySummary,
 } from '@/types/expedition';
 
 interface CostCalculatorProps {
@@ -37,6 +39,9 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
   const [memberAccommodation, setMemberAccommodation] = useState<MemberAccommodationRecord[]>(
     initialData.memberAccommodationRecords || []
   );
+
+  // 補助対象費サマリー
+  const [subsidySummary, setSubsidySummary] = useState<SubsidySummary | null>(null);
 
   // 並行 saveAll を防ぐミューテックス
   const isSavingRef = useRef(false);
@@ -331,6 +336,20 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
           expeditionId={expeditionId}
           selfPaymentTotal={selfPaymentTotal}
         />
+        <SubsidySection
+          expeditionId={expeditionId}
+          startDate={expedition.start_date}
+          endDate={expedition.end_date}
+          moveInDate={expedition.move_in_date}
+          moveOutDate={expedition.move_out_date}
+          memberCounts={{
+            athletes: members.filter(m => m.role === 'athlete').length,
+            advisors: members.filter(m => m.role === 'advisor').length,
+            others: members.filter(m => m.role !== 'athlete' && m.role !== 'advisor').length,
+            total: members.length,
+          }}
+          onSummaryChange={setSubsidySummary}
+        />
         <MemberTable
           members={members}
           onChange={setMembers}
@@ -386,6 +405,7 @@ export default function CostCalculator({ initialData, onDataChange }: CostCalcul
           mealRecords={mealRecords}
           memberTransport={memberTransport}
           memberAccommodation={memberAccommodation}
+          subsidySummary={subsidySummary}
         />
       </div>
     </div>
